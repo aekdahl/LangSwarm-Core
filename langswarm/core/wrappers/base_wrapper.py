@@ -1,4 +1,4 @@
-from langswarm.registry.agent_registry import AgentRegistry
+from ..registry.agents import AgentRegistry
 
 class BaseWrapper:
     """
