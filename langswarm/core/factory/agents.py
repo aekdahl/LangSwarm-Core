@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from ..wrappers.agent_wrapper import AgentWrapper
+from ..wrappers.generic import AgentWrapper
 
 try:
     from llama_index import GPTSimpleVectorIndex, Document
