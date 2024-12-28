@@ -52,12 +52,13 @@ class LLM:
         if provider == 'langchain-openai':
             self.api_key = self._get_api_key(provider, api_key)
             try:
-                self.client = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
+                from langchain.chat_models import ChatOpenAI
             except ImportError:
                 raise ImportError(
                     "Neither LangChain nor OpenAI is available. Please install them:\n"
                     "  pip install langchain langchain-openai"
                 )
+            self.client = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
         elif provider == 'openai':
             self.api_key = self._get_api_key(provider, api_key)
             try:
