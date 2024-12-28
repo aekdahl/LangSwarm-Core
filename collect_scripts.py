@@ -32,7 +32,7 @@ def collect_scripts(start_folder="START_FOLDER", output_file="collected_scripts.
 
 if __name__ == "__main__":
     output_filename = "collected_scripts.txt"
-    start_folder = "langswarm/core"
+    start_folder = "langswarm"
     print(f"Collecting scripts from '{start_folder}' into {output_filename}...")
     collect_scripts(start_folder=start_folder, output_file=output_filename)
     print(f"All scripts have been collected into {output_filename}.")
