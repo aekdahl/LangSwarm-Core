@@ -1,0 +1,1026 @@
+
+--------------------------------------------------------------------------------
+File: __init__.py
+--------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: core/__init__.py
+--------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: core/wrappers/memory_mixin.py
+--------------------------------------------------------------------------------
+
+try:
+    from langchain.memory import BaseMemory
+except ImportError:
+    BaseMemory = None
+
+class MemoryMixin:
+    """
+    Mixin for memory management.
+    """
+
+    def _initialize_memory(self, agent: Any, memory: Optional[Any], in_memory: list) -> Optional[Any]:
+        """
+        Initialize or validate memory for the agent.
+        """
+        if hasattr(agent, "memory") and agent.memory:
+            return agent.memory
+
+        if memory:
+            if BaseMemory and isinstance(memory, BaseMemory):
+                return memory
+            raise ValueError("Invalid memory instance provided.")
+
+        return in_memory
+
+
+
+--------------------------------------------------------------------------------
+File: core/wrappers/logging_mixin.py
+--------------------------------------------------------------------------------
+
+import logging
+
+try:
+    from langsmith.tracers.helpers import traceable, log_error
+    from langsmith.wrappers import wrap_openai
+    from langsmith import LangSmithTracer
+except ImportError:
+    traceable = None
+    log_error = None
+    wrap_openai = None
+    LangSmithTracer = None
+
+
+class LoggingMixin:
+    """
+    Mixin for managing LangSmith logging and fallback logging.
+    """
+
+    def _initialize_logger(self, name: str, langsmith_api_key: Optional[str]) -> logging.Logger:
+        """
+        Initialize a logger for the agent, with LangSmith integration if available.
+
+        Parameters:
+        - name (str): The name of the logger.
+        - langsmith_api_key (str): API key for LangSmith, if enabled.
+
+        Returns:
+        - Logger instance.
+        """
+        self.langsmith_enabled = langsmith_api_key is not None and traceable is not None
+        self.langsmith_tracer = None
+
+        if self.langsmith_enabled and LangSmithTracer:
+            self.langsmith_tracer = LangSmithTracer(api_key=langsmith_api_key)
+
+        logger = logging.getLogger(name)
+        if not logger.hasHandlers():
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+        return logger
+
+    def _log_error(self, error_message: str):
+        """
+        Log errors to LangSmith or fallback logger.
+
+        Parameters:
+        - error_message (str): The error message to log.
+        """
+        if self.langsmith_enabled and self.langsmith_tracer and log_error:
+            self.langsmith_tracer.log_error(error_message, name=self.name, run_type="error")
+        else:
+            self.logger.error(f"Error in {self.name}: {error_message}")
+
+
+
+--------------------------------------------------------------------------------
+File: core/wrappers/generic.py
+--------------------------------------------------------------------------------
+
+from ..bot import LLM
+from .base_wrapper import BaseWrapper
+from .logging_mixin import LoggingMixin
+from .memory_mixin import MemoryMixin
+
+
+class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
+    """
+    A unified wrapper for LLM agents, combining memory management, logging, and LangSmith integration.
+    """
+
+    def __init__(self, name, agent, memory=None, is_conversational=False, langsmith_api_key=None, **kwargs):
+        kwargs["name"] = name
+        kwargs["provider"] = "wrapper"
+        super().__init__(name, agent, **kwargs)
+        
+        self.logger = self._initialize_logger(name, langsmith_api_key)
+        self.memory = self._initialize_memory(agent, memory, self.in_memory)
+        self.is_conversational = is_conversational
+
+    def chat(self, q=None, reset=False, erase_query=False, remove_linebreaks=False):
+        """
+        Process a query using the wrapped agent.
+
+        Parameters:
+        - q (str): Query string.
+        - reset (bool): Whether to reset memory before processing.
+        - erase_query (bool): Whether to erase the query after processing.
+        - remove_linebreaks (bool): Remove line breaks from the query.
+
+        Returns:
+        - str: The agent's response.
+        """
+        if reset and self.memory:
+            self.memory.clear()
+
+        if q:
+            self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
+            self.logger.info(f"Query sent to agent {self.name}: {q}")
+
+        try:
+            # Handle different agent types
+            if hasattr(self.agent, "run"):
+                # LangChain agents
+                response = self.agent.run(q)
+            elif _is_llamaindex_agent(self.agent):
+                # LlamaIndex agents
+                context = " ".join([message["content"] for message in self.in_memory])
+                response = self.agent.query(context if self.memory else q).response
+            elif callable(self.agent):
+                # Hugging Face agents
+                context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
+                response = self.agent(context)
+            else:
+                raise ValueError(f"Unsupported agent type: {type(self.agent)}")
+
+            # Parse and log response
+            response = self._parse_response(response)
+            self.logger.info(f"Agent {self.name} response: {response}")
+
+            if erase_query:
+                self.remove()
+
+            return response
+
+        except Exception as e:
+            self._log_error(str(e))
+            raise
+
+    def _parse_response(self, response: Any) -> str:
+        """
+        Parse the response from the wrapped agent.
+
+        Parameters:
+        - response: The agent's raw response.
+
+        Returns:
+        - str: The parsed response.
+        """
+        if hasattr(response, "content"):
+            return response.content
+        elif isinstance(response, dict):
+            return response.get("generated_text", "")
+        return str(response)
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Delegate attribute access to the wrapped agent.
+
+        Parameters:
+        - name (str): The attribute name.
+
+        Returns:
+        - The attribute from the wrapped agent.
+        """
+        return getattr(self.agent, name)
+
+
+
+--------------------------------------------------------------------------------
+File: core/wrappers/__init__.py
+--------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: core/wrappers/base_wrapper.py
+--------------------------------------------------------------------------------
+
+from ..registry.agents import AgentRegistry
+
+class BaseWrapper:
+    """
+    Base class for wrapping agents, providing initialization and validation.
+    """
+
+    def __init__(self, name: str, agent: Any, **kwargs):
+        self.name = name
+        self.agent = agent
+        self.kwargs = kwargs
+
+        # Register the agent in the global registry
+        AgentRegistry.register(
+            name=name,
+            agent=self,
+            agent_type=type(agent).__name__,
+            metadata=kwargs.get('metadata', {})
+        )
+
+    @staticmethod
+    def _get_module_path(module_class: Any) -> str:
+        """
+        Returns the full module path of a given class or callable.
+        :param module_class: The class or callable to get the module path for.
+        :type module_class: Any
+        :return: The module path
+        :rtype: str
+        """
+        return (
+            getattr(module_class, "__module__", "")
+            + "."
+            + getattr(module_class, "__name__", "")
+        ).strip(".")
+        
+    @staticmethod
+    def _is_openai_llm(agent: Any) -> bool:
+        """
+        Determine if the agent is an OpenAI LLM.
+        Parameters:
+        - agent: The agent to check.
+        Returns:
+        - bool: True if the agent is an OpenAI LLM, False otherwise.
+        """
+        return hasattr(agent, "model") and "openai" in str(type(agent)).lower()
+
+    @staticmethod
+    def _is_llamaindex_agent(agent):
+        """
+        Determine if the given agent is a LlamaIndex agent.
+    
+        Parameters:
+        - agent: The agent to check.
+    
+        Returns:
+        - bool: True if the agent is a LlamaIndex agent, False otherwise.
+        """
+        module_name = getattr(agent.__class__, "__module__", "")
+        if "llama_index" in module_name:
+            return True
+        return callable(getattr(agent, "query", None))
+
+    def _validate_agent(self):
+        if not callable(self.agent) and not hasattr(self.agent, "run"):
+            raise ValueError(f"Unsupported agent type: {type(self.agent)}")
+
+
+
+--------------------------------------------------------------------------------
+File: core/utils/__init__.py
+--------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: core/utils/utilities.py
+--------------------------------------------------------------------------------
+
+import time
+import hashlib
+from io import StringIO
+from html.parser import HTMLParser
+
+# pip install pyyaml
+import yaml
+import ast
+import uuid
+import json
+import re
+
+#%pip install --upgrade tiktoken
+import tiktoken
+
+class Utils:
+    def __init__(self):
+        self.total_tokens_estimate = 0
+        self.total_price_estimate = 0
+        self.bot_logs = []
+        
+    def bot_log(self, bot, message):
+        self.bot_logs.append((bot, message))
+
+    def print_current_estimates(self):
+        print('Estimated total tokens:', self.total_tokens_estimate)
+        print('Estimated total price: $', self.total_price_estimate)
+
+    def update_price_tokens_use_estimates(self, string, model = 'gpt-4-1106-preview', price = 0.150, verbose = False):
+        tokens, price = self.price_tokens_from_string(string, model, price, verbose)
+        self.total_tokens_estimate = self.total_tokens_estimate + tokens
+        self.total_price_estimate = self.total_price_estimate + price
+        if verbose:
+            self.print_current_estimates()
+
+    def price_tokens_from_string(self, string, encoding_name, price = 0.150, verbose = False):
+        """Returns the number of tokens in a text string."""
+        try:
+            encoding = tiktoken.encoding_for_model(encoding_name)
+        except:
+            encoding = tiktoken.encoding_for_model('gpt-4-1106-preview')
+        num_tokens = len(encoding.encode(string))
+        price = round(num_tokens*price/1000000, 4)
+        if verbose:
+            print('Estimated tokens:', num_tokens)
+            print('Estimated price: $', price)
+        
+        return num_tokens, price
+
+    def is_valid_json(self, json_string):
+        try:
+            json.loads(json_string)
+        except ValueError:
+            return False
+
+        return True
+
+    def is_valid_python(self, code):
+        try:
+            ast.parse(code)
+        except SyntaxError:
+            return False
+
+        return True
+
+    def is_valid_yaml(self, code):
+        try:
+            yaml.load(code)
+        except yaml.YAMLError:
+            return False
+
+        return True
+    
+    def clear_markdown(self, text):
+        
+        # Remove starting code markup
+        if text.startswith('```python'):
+            text = text.split('```python',1)[-1]
+        elif text.startswith('```json'):
+            text = text.split('```json',1)[-1]
+        elif text.startswith('```yaml'):
+            text = text.split('```yaml',1)[-1]
+        elif text.startswith('```plaintext'):
+            text = text.split('```plaintext',1)[-1]
+        elif text.startswith('```javascript'):
+            text = text.split('```javascript',1)[-1]
+        elif text.startswith('```html'):
+            text = text.split('```html',1)[-1]
+        elif text.startswith('```css'):
+            text = text.split('```css',1)[-1]
+        elif text.startswith('```'):
+            text = text.split('```',1)[-1]
+
+        # Remove ending code markup
+        if text.endswith('```'):
+            text = text.rsplit('```',1)[0]
+
+        return text
+
+    def clean_text(self, text, remove_linebreaks = False):
+        txt = text.encode('ascii', 'ignore').decode()
+        txt = txt.replace('\\n',' ')
+        if remove_linebreaks:
+            txt = txt.replace('\n',' ')
+        return txt.replace('\\u00a0',' ')
+
+    def strip_tags(self, text, remove_linebreaks = False):
+        strip_tags = StripTags()
+        strip_tags.reset()
+        strip_tags.feed(text)
+        txt = strip_tags.get_data().encode('ascii', 'ignore').decode()
+        txt = txt.replace('\\n',' ')
+        if remove_linebreaks:
+            txt = txt.replace('\n',' ')
+        return txt.replace('\\u00a0',' ')
+    
+    def generate_short_uuid(self, length = 8):
+        # Generate a UUID and return a shortened version (min. 2 characters)
+        return 'z'+str(uuid.uuid4())[:max(1,length-1)]
+    
+    def generate_md5_hash(self, query):
+        return hashlib.md5(str(query).encode('utf-8')).hexdigest()
+    
+    def safe_str_to_int(self, s):
+        # Extract numeric part using regex
+        match = re.search(r"[-+]?\d*\.?\d+", s)
+        if match:
+            return int(match.group())
+        return 0  # Return 0 if no valid number is found
+
+
+class StripTags(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.strict = False
+        self.convert_charrefs= True
+        self.text = StringIO()
+    def handle_data(self, d):
+        self.text.write(d)
+    def get_data(self):
+        return self.text.getvalue()
+
+class SafeMap(dict):
+    def __missing__(self, key):
+        return f'{{{key}}}'
+
+
+
+--------------------------------------------------------------------------------
+File: core/factory/agents.py
+--------------------------------------------------------------------------------
+
+from typing import Any, Optional
+from langswarm.wrappers.agent_wrapper import AgentWrapper
+
+try:
+    from llama_index import GPTSimpleVectorIndex, Document
+except ImportError:
+    GPTSimpleVectorIndex = None
+    Document = None
+
+class AgentFactory:
+    """
+    A factory for creating LangSwarm agents, including LangChain, Hugging Face, OpenAI, and LlamaIndex agents.
+    """
+
+    @staticmethod
+    def create(
+        name: str,
+        agent_type: str,
+        documents: Optional[list] = None,
+        memory: Optional[Any] = None,
+        langsmith_api_key: Optional[str] = None,
+        **kwargs,
+    ) -> AgentWrapper:
+        """
+        Create an agent with the given parameters.
+
+        Parameters:
+        - name (str): The name of the agent.
+        - agent_type (str): The type of agent ("langchain", "huggingface", "openai", "llamaindex", etc.).
+        - documents (list, optional): Documents for LlamaIndex agents.
+        - memory (optional): A memory instance to use with the agent.
+        - langsmith_api_key (str, optional): API key for LangSmith logging.
+        - kwargs: Additional parameters for the agent.
+
+        Returns:
+        - AgentWrapper: A wrapped agent ready for use.
+        """
+        agent = None
+
+        if agent_type.lower() == "llamaindex":
+            if GPTSimpleVectorIndex is None or Document is None:
+                raise ImportError("LlamaIndex is not installed. Install it with 'pip install llama-index'.")
+            if not documents:
+                raise ValueError("Documents must be provided to create a LlamaIndex agent.")
+            doc_objects = [Document(text=doc) for doc in documents]
+            agent = GPTSimpleVectorIndex(doc_objects)
+
+        elif agent_type.lower() == "langchain-openai":
+            # Example: Create a LangChain agent (e.g., OpenAI model)
+            from langchain.llms import OpenAI
+            model = kwargs.get("model", "gpt-3.5-turbo")
+            agent = OpenAI(model=model, openai_api_key=kwargs.get("openai_api_key"))
+
+        elif agent_type.lower() == "langchain":
+            # Example: Create a LangChain agent (e.g., OpenAI model)
+            from langchain.llms import OpenAI
+            model = kwargs.get("model", "gpt-3.5-turbo")
+            agent = OpenAI(model=model, openai_api_key=kwargs.get("openai_api_key"))
+
+        elif agent_type.lower() == "huggingface":
+            # Example: Create a Hugging Face agent
+            from transformers import pipeline
+            task = kwargs.get("task", "text-generation")
+            model = kwargs.get("model", "gpt2")
+            agent = pipeline(task, model=model)
+
+        elif agent_type.lower() == "openai":
+            # Example: Create an OpenAI agent directly
+            import openai
+            agent = openai.ChatCompletion
+
+        else:
+            raise ValueError(f"Unsupported agent type: {agent_type}")
+
+        # Wrap the agent using AgentWrapper
+        return AgentWrapper(
+            name=name,
+            agent=agent,
+            memory=memory,
+            langsmith_api_key=langsmith_api_key,
+            **kwargs,
+        )
+
+
+
+--------------------------------------------------------------------------------
+File: core/factory/__init__.py
+--------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: core/registry/agents.py
+--------------------------------------------------------------------------------
+
+# agents.py
+class AgentRegistry:
+    """
+    Centralized registry for managing available LLM agents.
+    """
+
+    _registry = {}
+
+    @classmethod
+    def register(cls, name, agent, agent_type, metadata=None):
+        """
+        Register an agent with the registry.
+
+        Parameters:
+        - name (str): Unique identifier for the agent.
+        - agent: The agent instance to register.
+        - agent_type (str): Type of the agent (e.g., 'langchain', 'huggingface').
+        - metadata (dict): Optional additional metadata about the agent.
+        """
+        cls._registry[name] = {
+            "agent": agent,
+            "type": agent_type,
+            "metadata": metadata or {},
+        }
+
+    @classmethod
+    def get(cls, name):
+        """
+        Retrieve an agent's details by name.
+
+        Parameters:
+        - name (str): The name of the agent.
+
+        Returns:
+        - dict: Agent details, or None if not found.
+        """
+        return cls._registry.get(name)
+
+    @classmethod
+    def list(cls):
+        """
+        List all registered agents.
+
+        Returns:
+        - dict: All agents in the registry.
+        """
+        return cls._registry
+
+    @classmethod
+    def remove(cls, name):
+        """
+        Remove an agent from the registry.
+
+        Parameters:
+        - name (str): The name of the agent.
+        """
+        if name in cls._registry:
+            del cls._registry[name]
+
+
+
+--------------------------------------------------------------------------------
+File: core/registry/__init__.py
+--------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: core/base/__init__.py
+--------------------------------------------------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: core/base/bot.py
+--------------------------------------------------------------------------------
+
+
+import os
+import json
+import logging
+
+try:
+    from langchain.memory import BaseMemory
+except ImportError:
+    BaseMemory = None  # Fallback if BaseMemory is not available
+
+from ..utils.utilities import Utils
+
+class LLM:
+    """
+    A class to interact with Large Language Models (LLMs) using LangChain or OpenAI.
+    
+    Provides methods for managing conversations, sending queries, and handling memory.
+    """
+    
+    def __init__(
+        self, 
+        provider='langchain-openai',
+        model='gpt-4o-mini-2024-07-18', 
+        api_key=None,
+        temperature=0.0,
+        response_format='auto',
+        system_prompt=None,
+        utils=None,
+        verbose=False,
+        name=None, 
+        team=None,
+        memory=None,
+        specialization=None
+    ):
+        """
+        Initialize the LLM instance.
+
+        Args:
+            provider (str): LLM provider ('langchain-openai' or 'openai').
+            model (str): Model name to use.
+            api_key (str): API key for the provider.
+            temperature (float): Sampling temperature for response variability.
+            response_format (str): Expected format of the response.
+            system_prompt (str): Initial system prompt to set the model context.
+            utils (Utils): Utility instance for logging and text processing.
+            verbose (bool): Verbosity flag for debugging and logs.
+            name (str): Name of the bot.
+            team (str): Associated team for the bot.
+            specialization (str): Bot's area of expertise.
+        """
+
+        if provider == 'langchain-openai':
+            self.api_key = self._get_api_key(provider, api_key)
+            try:
+                self.client = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
+            except ImportError:
+                raise ImportError(
+                    "Neither LangChain nor OpenAI is available. Please install them:\n"
+                    "  pip install langchain langchain-openai"
+                )
+        elif provider == 'openai':
+            self.api_key = self._get_api_key(provider, api_key)
+            try:
+                import openai
+            except ImportError:
+                raise ImportError(
+                    "OpenAI is not available. Please install it:\n"
+                    "  pip install openai"
+                )
+            openai.api_key = self.api_key
+            self.client = openai
+        elif provider == 'wrapper':
+            self.api_key = api_key
+            team = team or 'wrappers'
+        else:
+            raise ValueError(f"Unsupported provider: {provider}.")
+
+        self.provider = provider
+        self.utils = utils or Utils()
+        self.memory = memory if not isinstance(memory, list) else None
+        self.in_memory = memory if isinstance(memory, list) else []
+        self.model = model
+        self.name = name
+        self.team = team
+        self.last_in_memory = ''
+        self.verbose = verbose
+        self.system_prompt = system_prompt
+        self.specialization = specialization
+
+        self.update_system_prompt()
+        self.utils.bot_log(self.name, {"role": "admin", "content": "Bot was created."})
+        
+        self.logger = logging.getLogger("LangSwarm.Bot")
+        if not self.logger.hasHandlers():
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
+
+        self.logger.info("Bot logger initialized.")
+
+    def _get_api_key(self, provider, api_key):
+        """
+        Retrieve the API key from environment variables or fallback to the provided key.
+
+        Args:
+            provider (str): LLM provider.
+            api_key (str): Provided API key.
+
+        Returns:
+            str: Resolved API key.
+        """
+        env_var_map = {
+            "langchain-openai": "OPENAI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "google": "GOOGLE_PALM_API_KEY",
+        }
+        env_var = env_var_map.get(provider.lower())
+
+        if env_var and (key_from_env := os.getenv(env_var)):
+            return key_from_env
+
+        if api_key:
+            return api_key
+
+        raise ValueError(f"API key for {provider} not found. Set {env_var} or pass the key explicitly.")
+    
+    def update_system_prompt(self, system_prompt=None):
+        """
+        Update the system prompt for the conversation.
+
+        Args:
+            system_prompt (str): New system prompt to set.
+        """
+        if system_prompt:
+            self.system_prompt = system_prompt
+
+        if self.system_prompt:
+            if self.memory:
+                if hasattr(self.memory, "messages"):
+                    messages = self.memory.messages  # Fetch current messages
+                    if len(messages) > 0:
+                        messages[0] = self.system_prompt
+                    else:
+                        messages = [self.system_prompt]
+                    self.memory.clear()       # Clear the persistent store
+                    for message in messages:
+                        self.memory.add_message(message)  # Re-save the updated list
+
+                    self.in_memory = messages
+                    
+                    self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
+                elif hasattr(self.memory, "chat_memory") and self.memory.chat_memory.messages:
+                    messages = self.memory.chat_memory.messages  # Fetch current messages
+                    if len(messages) > 0:
+                        messages[0] = self.system_prompt
+                    else:
+                        messages = [self.system_prompt]
+                    self.memory.clear()       # Clear the persistent store
+                    for message in messages:
+                        self.memory.add_message(message)  # Re-save the updated list
+
+                    self.in_memory = messages
+                    
+                    self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
+            
+                else:
+                    raise ValueError('The memory instance has no attribute messages.')
+            else:
+                if self.in_memory and len(self.in_memory) > 0:
+                    self.in_memory[0] = self.system_prompt
+                else:
+                    self.in_memory = [self.system_prompt]
+                        
+                self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
+            
+
+    def add_message(self, content, role='assistant', remove_linebreaks=False):
+        """
+        Add a message to memory, if memory is enabled.
+
+        Parameters:
+        - role (str): The role of the message sender (e.g., "user", "assistant").
+        - content (str): The message content.
+        """
+        if self.memory:
+            self.memory.add_message(role, content)
+            
+        self.last_in_memory = content
+        cleaned_message = self.utils.clean_text(content, remove_linebreaks=remove_linebreaks)
+        if self.in_memory:
+            self.in_memory.append({"role": role, "content": cleaned_message})
+        else:
+            self.in_memory = [{"role": role, "content": cleaned_message}]
+        
+        self.utils.bot_log(self.name, cleaned_message)
+        
+        if self.verbose:
+            print(f"[{role}] {content}")
+            
+    def add_response(self, message, role='assistant', remove_linebreaks=False):
+        """
+        Temporary patch.
+        """
+        self.add_message(message, role=role, remove_linebreaks=remove_linebreaks)
+
+    def clear_memory(self):
+        """
+        Clear the stored memory.
+        """
+        self.reset(clear = True)
+        
+    def remove(self, index=-1, query_and_response=False):
+        """
+        Remove a message from memory.
+
+        Args:
+            index (int): Index of the message to remove.
+            query_and_response (bool): Whether to remove both query and response.
+        """
+        
+        if self.memory:
+            if hasattr(self.memory, "messages"):
+                messages = self.memory.messages  # Fetch current messages
+                if index < len(messages) and len(messages) > 0:
+                    messages.pop(index)  # Remove the message
+                if query_and_response and index < len(messages) and len(messages) > 0:
+                    messages.pop(index)  # Remove the message
+                self.memory.clear()       # Clear the persistent store
+                for message in messages:
+                    self.memory.add_message(message)  # Re-save the updated list
+                
+                self.in_memory = messages
+            
+            elif hasattr(self.memory, "chat_memory") and self.memory.chat_memory.messages:
+                messages = self.memory.chat_memory.messages  # Fetch current messages
+                if index < len(messages) and len(messages) > 0:
+                    messages.pop(index)  # Remove the message
+                if query_and_response and index < len(messages) and len(messages) > 0:
+                    messages.pop(index)  # Remove the message
+                self.memory.clear()       # Clear the persistent store
+                for message in messages:
+                    self.memory.add_message(message)  # Re-save the updated list
+                
+                self.in_memory = messages
+            else:
+                raise ValueError('The memory instance has no attribute messages.')
+    
+        elif self.in_memory and index < len(self.in_memory):
+            del self.in_memory[index]
+            self.utils.bot_log(self.name, {"role": "admin", "content": "Bot removed memory."})
+
+            if query_and_response and index < len(self.in_memory) and self.in_memory:
+                del self.in_memory[index]
+                self.utils.bot_log(self.name, {"role": "admin", "content": "Bot removed memory again."})
+
+    def chat(self, q=None, as_json=False, reset=False, erase_query=False, remove_linebreaks=False):
+        """
+        Send a query to the LLM and receive a response.
+
+        Args:
+            q (str): Query to send.
+            as_json (bool): Whether to return the response as JSON.
+            reset (bool): Whether to reset memory before sending the query.
+            erase_query (bool): Whether to remove the query from memory after processing.
+            remove_linebreaks (bool): Whether to remove line breaks from the query.
+
+        Returns:
+            str: The response from the LLM.
+        """
+        if reset:
+            self.reset()
+
+        if q:
+            self.add_message(q, role='user', remove_linebreaks=remove_linebreaks)
+
+        if self.provider == 'langchain-openai':
+            if self.memory and BaseMemory is not None and isinstance(self.memory, BaseMemory):
+                response = self.client.run(q).content
+            else:
+                response = self.client.invoke(self.in_memory).content
+        elif self.provider == 'openai':
+            completion = self.client.ChatCompletion.create(
+                model=self.model,
+                messages=self.in_memory,
+                temperature=0.0
+            )
+            response = completion['choices'][0]['message']['content']
+        else:
+            raise ValueError(f"Unsupported provider: {self.provider}")
+
+        if q and erase_query:
+            self.remove()
+
+        self.utils.bot_log(self.name, response)
+
+        if self.utils:
+            self.utils.update_price_tokens_use_estimates(str(self.in_memory) + response, model=self.model, verbose=False)
+
+        return response
+
+    def reset(self, clear = False):
+        """
+        Reset the LLM state, including clearing memory and reset the system prompt.
+        """
+        if self.memory:
+            self.memory.clear()
+        
+        self.utils.bot_log(self.name, {"role": "admin", "content": "Bot was reset."})
+        self.in_memory = []
+        self.last_in_memory = ''
+                                                      
+        if not clear:
+            self.update_system_prompt()
+        
+        if self.verbose:
+            print(f"Resetting {self.name} state.")
+
+    def share_conversation(self):
+        """
+        Share the current conversation as a JSON string.
+
+        Returns:
+            str: JSON string of conversation memory (excluding system prompt).
+        """
+        return "".join(json.dumps(x) for x in self.in_memory[1:]) if self.in_memory else ""
+
+    def get_last_in_memory(self):
+        """
+        Get the last message stored in memory.
+
+        Returns:
+            str: Content of the last message.
+        """
+        return self.last_in_memory or (self.in_memory[-1]['content'] if self.in_memory else "")
+
+    def get_memory(self, start=1, stop=None):
+        """
+        Retrieve a subset of the conversation memory.
+
+        Args:
+            start (int): Start index for the memory slice.
+            stop (int): End index for the memory slice.
+
+        Returns:
+            list: Subset of the conversation memory.
+        """
+        if self.memory:
+            if hasattr(self.memory, "chat_memory") and self.memory.chat_memory.messages:
+                return self.memory.chat_memory.messages[start:stop]
+            elif hasattr(self.memory, "messages") and self.memory.messages:
+                return self.memory.messages[start:stop]
+            else:
+                return []
+
+        return self.in_memory[start:stop] if self.in_memory else []
+
+    def set_memory(self, memory, clear=True):
+        """
+        Set the conversation memory.
+
+        Args:
+            memory (list): List of memory items to set.
+            clear (bool): Whether to clear existing memory before setting.
+        """
+        
+        if self.memory:
+            if clear:
+                self.memory.clear()
+                self.in_memory = messages
+                self.utils.bot_log(self.name, {"role": "admin", "content": "Cleared all memories."})
+            else:
+                self.in_memory.extend(memory)
+                
+            for mem in memory:
+                self.memory.add_message(mem)
+                self.utils.bot_log(self.name, mem)
+            
+        else:
+            if clear:
+                self.in_memory = [self.in_memory[0]] + memory if self.in_memory else memory
+                self.utils.bot_log(self.name, {"role": "admin", "content": "Cleared all memories."})
+            else:
+                self.in_memory.extend(memory)
+            
+            for mem in memory:
+                self.utils.bot_log(self.name, mem)
+
+
