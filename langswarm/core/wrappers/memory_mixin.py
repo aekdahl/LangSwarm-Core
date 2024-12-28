@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 try:
     from langchain.memory import BaseMemory
 except ImportError:
