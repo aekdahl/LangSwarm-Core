@@ -1,7 +1,3 @@
-Here’s a suggested `README.md` for your **LangSwarm-Core** project:
-
----
-
 # LangSwarm-Core
 
 LangSwarm-Core is a framework designed to support multi-agent systems using Large Language Models (LLMs). It provides utilities, memory management, logging integration, and agent orchestration tools to build robust AI ecosystems with modularity and flexibility.
