@@ -1,4 +1,4 @@
-from ..bot import LLM
+from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
 from .logging_mixin import LoggingMixin
 from .memory_mixin import MemoryMixin
