@@ -22,4 +22,4 @@ class MemoryMixin:
                 return memory
             raise ValueError("Invalid memory instance provided.")
 
-        return in_memory
+        return None
