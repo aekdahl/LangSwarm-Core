@@ -47,6 +47,14 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
             if hasattr(self.agent, "run"):
                 # LangChain agents
                 response = self.agent.run(q)
+                if hasattr(self.agent, "memory") and self.agent.memory:
+                    # Memory is already managed by the agent
+                    response = self.agent.run(q)
+                else:
+                    # No memory, include context manually
+                    context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else ""
+                    full_query = f"{context}\n{q}"
+                    response = self.agent.run(full_query)
             elif self._is_llamaindex_agent(self.agent):
                 # LlamaIndex agents
                 context = " ".join([message["content"] for message in self.in_memory])
@@ -55,7 +63,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 # Hugging Face agents
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
-            elif self._is_openai_llm(self.agent):
+            elif self._is_openai_llm(self.agent) or hasattr(self.agent, "ChatCompletion"):
                 completion = self.agent.ChatCompletion.create(
                     model=self.model,
                     messages=self.in_memory,
@@ -63,7 +71,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 )
                 response = completion['choices'][0]['message']['content']
             else:
-                raise ValueError(f"Unsupported agent type: {type(self.agent)}")
+                raise ValueError(f"Unsupported agent type: {type(self.agent)} for agent: {self.agent}")
 
             # Parse and log response
             response = self._parse_response(response)
