@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="langswarm-core",
-    version="0.0.11",
+    version="0.0.12",
     description="A core framework for multi-agent LLM ecosystems",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
