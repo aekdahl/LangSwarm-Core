@@ -32,7 +32,8 @@ class LLM:
         team=None,
         memory=None,
         specialization=None,
-        agent=None
+        agent=None,
+        **kwargs
     ):
         """
         Initialize the LLM instance.
