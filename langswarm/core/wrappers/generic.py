@@ -47,7 +47,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
             if hasattr(self.agent, "run"):
                 # LangChain agents
                 response = self.agent.run(q)
-            elif _is_llamaindex_agent(self.agent):
+            elif self._is_llamaindex_agent(self.agent):
                 # LlamaIndex agents
                 context = " ".join([message["content"] for message in self.in_memory])
                 response = self.agent.query(context if self.memory else q).response
