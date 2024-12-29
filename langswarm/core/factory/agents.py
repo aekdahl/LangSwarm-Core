@@ -66,9 +66,14 @@ class AgentFactory:
 
         elif agent_type.lower() == "openai":
             # Example: Create an OpenAI agent directly
-            import openai
+            try:
+                import openai
+            except ImportError:
+                raise ImportError(
+                    "OpenAI is not available. Please install it:\n"
+                    "  pip install openai"
+                )
             agent = openai.ChatCompletion
-
         else:
             raise ValueError(f"Unsupported agent type: {agent_type}")
 
