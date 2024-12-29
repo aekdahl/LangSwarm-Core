@@ -153,9 +153,9 @@ class LLM:
                 if hasattr(self.memory, "messages"):
                     messages = self.memory.messages  # Fetch current messages
                     if len(messages) > 0:
-                        messages[0] = self.system_prompt
+                        messages[0] = {"role": "system", "content": self.system_prompt}
                     else:
-                        messages = [self.system_prompt]
+                        messages = [{"role": "system", "content": self.system_prompt}]
                     self.memory.clear()       # Clear the persistent store
                     for message in messages:
                         self.memory.add_message(message)  # Re-save the updated list
@@ -166,9 +166,9 @@ class LLM:
                 elif hasattr(self.memory, "chat_memory") and self.memory.chat_memory.messages:
                     messages = self.memory.chat_memory.messages  # Fetch current messages
                     if len(messages) > 0:
-                        messages[0] = self.system_prompt
+                        messages[0] = {"role": "system", "content": self.system_prompt}
                     else:
-                        messages = [self.system_prompt]
+                        messages = [{"role": "system", "content": self.system_prompt}]
                     self.memory.clear()       # Clear the persistent store
                     for message in messages:
                         self.memory.add_message(message)  # Re-save the updated list
@@ -181,9 +181,9 @@ class LLM:
                     raise ValueError('The memory instance has no attribute messages.')
             else:
                 if self.in_memory and len(self.in_memory) > 0:
-                    self.in_memory[0] = self.system_prompt
+                    self.in_memory[0] = {"role": "system", "content": self.system_prompt}
                 else:
-                    self.in_memory = [self.system_prompt]
+                    self.in_memory = [{"role": "system", "content": self.system_prompt}]
                         
                 self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
             
