@@ -293,12 +293,20 @@ class LLM:
             else:
                 response = self.agent.invoke(self.in_memory).content
         elif self.provider == 'openai':
-            completion = self.agent.ChatCompletion.create(
-                model=self.model,
-                messages=self.in_memory,
-                temperature=0.0
-            )
-            response = completion['choices'][0]['message']['content']
+            try:
+                completion = self.agent.ChatCompletion.create(
+                    model=self.model,
+                    messages=self.in_memory,
+                    temperature=0.0
+                )
+                response = completion['choices'][0]['message']['content']
+            except:
+                completion = self.agent.chat.completions.create(
+                    model=self.model,
+                    messages=self.in_memory,
+                    temperature=0.0
+                )
+                response = completion.choices[0].message.content
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
