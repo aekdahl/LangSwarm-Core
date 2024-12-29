@@ -13,7 +13,6 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
     def __init__(self, name, agent, memory=None, is_conversational=False, langsmith_api_key=None, **kwargs):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
-        print(kwargs)
         super().__init__(name=name, agent=agent, provider="wrapper", **kwargs)
         
         self.logger = self._initialize_logger(name, langsmith_api_key)
@@ -64,12 +63,21 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
             elif self._is_openai_llm(self.agent) or hasattr(self.agent, "ChatCompletion"):
-                completion = self.agent.chat.completions.create(
-                    model=self.model,
-                    messages=self.in_memory,
-                    temperature=0.0
-                )
-                response = completion.choices[0].message.content
+                print(self.in_memory)
+                try:
+                    completion = self.agent.ChatCompletion.create(
+                        model=self.model,
+                        messages=self.in_memory,
+                        temperature=0.0
+                    )
+                    response = completion['choices'][0]['message']['content']
+                except:
+                    completion = self.agent.chat.completions.create(
+                        model=self.model,
+                        messages=self.in_memory,
+                        temperature=0.0
+                    )
+                    response = completion.choices[0].message.content
             else:
                 raise ValueError(f"Unsupported agent type: {type(self.agent)} for agent: {self.agent}")
 
