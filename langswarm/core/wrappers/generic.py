@@ -33,8 +33,10 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
         Returns:
         - str: The agent's response.
         """
-        if reset and self.memory:
-            self.memory.clear()
+        if reset:
+            self.in_memory = []
+            if self.memory and hasattr(self.memory, clear):
+                self.memory.clear()
 
         if q:
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
