@@ -13,6 +13,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
     def __init__(self, name, agent, memory=None, is_conversational=False, langsmith_api_key=None, **kwargs):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
+        print(kwargs)
         super().__init__(name, agent=agent, provider="wrapper", **kwargs)
         
         self.logger = self._initialize_logger(name, langsmith_api_key)
