@@ -51,7 +51,8 @@ class LLM:
             team (str): Associated team for the bot.
             specialization (str): Bot's area of expertise.
         """
-        self.agent = agent or SimpleNamespace
+        self.agent = agent or SimpleNamespace()
+        print(kwargs)
 
         if provider == 'langchain-openai':
             self.api_key = self._get_api_key(provider, api_key)
