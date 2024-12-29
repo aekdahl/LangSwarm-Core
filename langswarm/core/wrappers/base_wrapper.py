@@ -1,5 +1,5 @@
 from ..registry.agents import AgentRegistry
-from typing import Any
+from typing import Any, Optional
 
 class BaseWrapper:
     """
