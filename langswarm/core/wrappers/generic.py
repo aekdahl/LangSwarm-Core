@@ -12,7 +12,9 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
     """
 
     def __init__(self, name, agent, memory=None, is_conversational=False, langsmith_api_key=None, **kwargs):
+        kwargs.pop("name", None)  # Remove `name` if it exists
         kwargs["name"] = name
+        kwargs.pop("provider", None)  # Remove `provider` if it exists
         kwargs["provider"] = "wrapper"
         super().__init__(name, agent, **kwargs)
         
