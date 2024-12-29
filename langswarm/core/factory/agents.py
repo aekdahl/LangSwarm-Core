@@ -73,7 +73,7 @@ class AgentFactory:
                     "OpenAI is not available. Please install it:\n"
                     "  pip install openai"
                 )
-            agent = openai.ChatCompletion
+            agent = openai
         else:
             raise ValueError(f"Unsupported agent type: {agent_type}")
 
