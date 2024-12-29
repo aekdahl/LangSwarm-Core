@@ -23,7 +23,9 @@ LangSwarm-Core is a framework designed to support multi-agent systems using Larg
   ```
 
 ### From PyPI
-Coming soon!
+  ```bash
+  pip install langswarm-core
+  ```
 
 ---
 
