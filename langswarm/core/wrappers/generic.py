@@ -64,12 +64,12 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
             elif self._is_openai_llm(self.agent) or hasattr(self.agent, "ChatCompletion"):
-                completion = self.agent.ChatCompletion.create(
+                completion = self.agent.chat.completions.create(
                     model=self.model,
                     messages=self.in_memory,
                     temperature=0.0
                 )
-                response = completion['choices'][0]['message']['content']
+                response = completion.choices[0].message.content
             else:
                 raise ValueError(f"Unsupported agent type: {type(self.agent)} for agent: {self.agent}")
 
