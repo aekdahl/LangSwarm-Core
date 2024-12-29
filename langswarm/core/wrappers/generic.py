@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
 from .logging_mixin import LoggingMixin
