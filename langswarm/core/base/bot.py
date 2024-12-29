@@ -2,6 +2,7 @@
 import os
 import json
 import logging
+from types import SimpleNamespace
 
 try:
     from langchain.memory import BaseMemory
@@ -30,7 +31,8 @@ class LLM:
         name=None, 
         team=None,
         memory=None,
-        specialization=None
+        specialization=None,
+        agent=None
     ):
         """
         Initialize the LLM instance.
@@ -48,6 +50,7 @@ class LLM:
             team (str): Associated team for the bot.
             specialization (str): Bot's area of expertise.
         """
+        self.agent = agent or SimpleNamespace
 
         if provider == 'langchain-openai':
             self.api_key = self._get_api_key(provider, api_key)
@@ -58,7 +61,7 @@ class LLM:
                     "Neither LangChain nor OpenAI is available. Please install them:\n"
                     "  pip install langchain langchain-openai"
                 )
-            self.client = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
+            self.agent = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
         elif provider == 'openai':
             self.api_key = self._get_api_key(provider, api_key)
             try:
@@ -69,8 +72,13 @@ class LLM:
                     "  pip install openai"
                 )
             openai.api_key = self.api_key
-            self.client = openai
+            self.agent = openai
         elif provider == 'wrapper':
+            try:
+                # Used for OpenAI
+                self.agent.api_key = api_key
+            except:
+                pass
             self.api_key = api_key
             team = team or 'wrappers'
         else:
@@ -279,11 +287,11 @@ class LLM:
 
         if self.provider == 'langchain-openai':
             if self.memory and BaseMemory is not None and isinstance(self.memory, BaseMemory):
-                response = self.client.run(q).content
+                response = self.agent.run(q).content
             else:
-                response = self.client.invoke(self.in_memory).content
+                response = self.agent.invoke(self.in_memory).content
         elif self.provider == 'openai':
-            completion = self.client.ChatCompletion.create(
+            completion = self.agent.ChatCompletion.create(
                 model=self.model,
                 messages=self.in_memory,
                 temperature=0.0
