@@ -55,6 +55,13 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 # Hugging Face agents
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
+            elif ...:
+                completion = self.agent.ChatCompletion.create(
+                    model=self.model,
+                    messages=self.in_memory,
+                    temperature=0.0
+                )
+                response = completion['choices'][0]['message']['content']
             else:
                 raise ValueError(f"Unsupported agent type: {type(self.agent)}")
 
