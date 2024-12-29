@@ -55,7 +55,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 # Hugging Face agents
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
-            elif ...:
+            elif self.:
                 completion = self.agent.ChatCompletion.create(
                     model=self.model,
                     messages=self.in_memory,
