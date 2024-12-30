@@ -51,13 +51,15 @@ class AgentFactory:
             # Example: Create a LangChain agent (e.g., OpenAI model)
             from langchain.llms import OpenAI
             model = kwargs.get("model", "gpt-3.5-turbo")
-            agent = OpenAI(model=model, openai_api_key=kwargs.get("openai_api_key"))
+            api_key = utils._get_api_key('langchain-openai', kwargs.get("openai_api_key"))
+            agent = OpenAI(model=model, openai_api_key=api_key)
 
         elif agent_type.lower() == "langchain":
             # Example: Create a LangChain agent (e.g., OpenAI model)
             from langchain.llms import OpenAI
             model = kwargs.get("model", "gpt-3.5-turbo")
-            agent = OpenAI(model=model, openai_api_key=kwargs.get("openai_api_key"))
+            api_key = utils._get_api_key('langchain', kwargs.get("openai_api_key"))
+            agent = OpenAI(model=model, openai_api_key=api_key)
 
         elif agent_type.lower() == "huggingface":
             # Example: Create a Hugging Face agent
@@ -75,6 +77,8 @@ class AgentFactory:
                     "OpenAI is not available. Please install it:\n"
                     "  pip install openai"
                 )
+                
+            openai.api_key = utils._get_api_key('openai', kwargs.get("openai_api_key"))
             agent = openai
         else:
             raise ValueError(f"Unsupported agent type: {agent_type}")
