@@ -52,10 +52,11 @@ class LLM:
             specialization (str): Bot's area of expertise.
         """
         self.agent = agent or SimpleNamespace()
-        print(kwargs)
+        self.provider = provider
+        self.utils = utils or Utils()
 
         if provider == 'langchain-openai':
-            self.api_key = self._get_api_key(provider, api_key)
+            self.api_key = self.utils._get_api_key(provider, api_key)
             try:
                 from langchain.chat_models import ChatOpenAI
             except ImportError:
@@ -65,7 +66,7 @@ class LLM:
                 )
             self.agent = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
         elif provider == 'openai':
-            self.api_key = self._get_api_key(provider, api_key)
+            self.api_key = self.utils._get_api_key(provider, api_key)
             try:
                 import openai
             except ImportError:
@@ -86,8 +87,7 @@ class LLM:
         else:
             raise ValueError(f"Unsupported provider: {provider}.")
 
-        self.provider = provider
-        self.utils = utils or Utils()
+        
         self.memory = memory if not isinstance(memory, list) else None
         self.in_memory = memory if isinstance(memory, list) else []
         self.model = model
@@ -110,33 +110,6 @@ class LLM:
             self.logger.setLevel(logging.INFO)
 
         self.logger.info("Bot logger initialized.")
-
-    def _get_api_key(self, provider, api_key):
-        """
-        Retrieve the API key from environment variables or fallback to the provided key.
-
-        Args:
-            provider (str): LLM provider.
-            api_key (str): Provided API key.
-
-        Returns:
-            str: Resolved API key.
-        """
-        env_var_map = {
-            "langchain-openai": "OPENAI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-            "google": "GOOGLE_PALM_API_KEY",
-        }
-        env_var = env_var_map.get(provider.lower())
-
-        if env_var and (key_from_env := os.getenv(env_var)):
-            return key_from_env
-
-        if api_key:
-            return api_key
-
-        raise ValueError(f"API key for {provider} not found. Set {env_var} or pass the key explicitly.")
     
     def update_system_prompt(self, system_prompt=None):
         """
