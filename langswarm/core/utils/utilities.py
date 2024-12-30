@@ -9,6 +9,7 @@ import ast
 import uuid
 import json
 import re
+import os
 
 #%pip install --upgrade tiktoken
 import tiktoken
@@ -18,6 +19,33 @@ class Utils:
         self.total_tokens_estimate = 0
         self.total_price_estimate = 0
         self.bot_logs = []
+
+    def _get_api_key(self, provider, api_key):
+        """
+        Retrieve the API key from environment variables or fallback to the provided key.
+
+        Args:
+            provider (str): LLM provider.
+            api_key (str): Provided API key.
+
+        Returns:
+            str: Resolved API key.
+        """
+        env_var_map = {
+            "langchain-openai": "OPENAI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "google": "GOOGLE_PALM_API_KEY",
+        }
+        env_var = env_var_map.get(provider.lower())
+
+        if env_var and (key_from_env := os.getenv(env_var)):
+            return key_from_env
+
+        if api_key:
+            return api_key
+
+        raise ValueError(f"API key for {provider} not found. Set {env_var} or pass the key explicitly.")
         
     def bot_log(self, bot, message):
         self.bot_logs.append((bot, message))
