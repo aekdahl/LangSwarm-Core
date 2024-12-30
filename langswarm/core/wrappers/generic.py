@@ -63,7 +63,6 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
             elif self._is_openai_llm(self.agent) or hasattr(self.agent, "ChatCompletion"):
-                print(self.in_memory)
                 try:
                     completion = self.agent.ChatCompletion.create(
                         model=self.model,
