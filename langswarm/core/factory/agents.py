@@ -1,5 +1,6 @@
 from typing import Any, Optional
 from ..wrappers.generic import AgentWrapper
+from ..utils.utilities import Utils
 
 try:
     from llama_index import GPTSimpleVectorIndex, Document
@@ -36,6 +37,7 @@ class AgentFactory:
         - AgentWrapper: A wrapped agent ready for use.
         """
         agent = None
+        utils = Utils()
 
         if agent_type.lower() == "llamaindex":
             if GPTSimpleVectorIndex is None or Document is None:
