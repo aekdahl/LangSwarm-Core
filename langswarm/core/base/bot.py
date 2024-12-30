@@ -79,7 +79,7 @@ class LLM:
         elif provider == 'wrapper':
             try:
                 # Used for OpenAI
-                self.agent.api_key = api_key
+                self.agent.api_key = self.utils._get_api_key('openai', api_key)
             except:
                 pass
             self.api_key = api_key
