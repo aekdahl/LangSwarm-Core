@@ -1,4 +1,4 @@
-langchain
-tiktoken
-llama-index
-pyyaml
+langchain==0.0.0
+tiktoken==0.0.0
+llama-index==0.0.0
+pyyaml==0.0.0
