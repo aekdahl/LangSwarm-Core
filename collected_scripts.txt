@@ -1,3 +1,792 @@
+# Total Document Length: 57522 characters
+
+
+--------------------------------------------------------------------------------
+File: collect_scripts.py
+--------------------------------------------------------------------------------
+
+import os
+
+# Function to write all files into a single output file
+def collect_scripts(start_folder="START_FOLDER", output_file="collected_scripts.txt", include_root_files=False):
+    # Determine the repository root and the start path
+    repo_root = os.getenv("GITHUB_WORKSPACE", os.getcwd())
+    start_path = os.path.join(repo_root, start_folder)
+
+    if not os.path.exists(start_path):
+        print(f"Error: The folder '{start_folder}' does not exist.")
+        return
+
+    total_length = 0  # Variable to track the total length of the document
+
+    with open(output_file, "w", encoding="utf-8") as outfile:
+        # Include files from the root folder of the repository if the flag is set
+        if include_root_files:
+            for file in os.listdir(repo_root):
+                file_path = os.path.join(repo_root, file)
+                if os.path.isfile(file_path) and not file.startswith("."):  # Exclude hidden files
+                    try:
+                        # Write the relative file name and path as a header
+                        relative_path = os.path.relpath(file_path, repo_root)
+                        outfile.write(f"\n{'-'*80}\n")
+                        outfile.write(f"File: {relative_path}\n")
+                        outfile.write(f"{'-'*80}\n\n")
+
+                        # Read the file content and write it
+                        with open(file_path, "r", encoding="utf-8") as infile:
+                            content = infile.read()
+                            total_length += len(content)
+                            outfile.write(content)
+                            outfile.write("\n\n")
+                    except Exception as e:
+                        # Log files that couldn't be read
+                        error_message = f"[ERROR READING FILE: {file} - {e}]\n\n"
+                        total_length += len(error_message)
+                        outfile.write(error_message)
+
+        # Walk through the specified folder and its subfolders
+        for root, _, files in os.walk(start_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, start_path)
+
+                try:
+                    # Write the relative file name and path as a header
+                    outfile.write(f"\n{'-'*80}\n")
+                    outfile.write(f"File: {relative_path}\n")
+                    outfile.write(f"{'-'*80}\n\n")
+
+                    # Read the file content and write it
+                    with open(file_path, "r", encoding="utf-8") as infile:
+                        content = infile.read()
+                        total_length += len(content)
+                        outfile.write(content)
+                        outfile.write("\n\n")
+                except Exception as e:
+                    # Log files that couldn't be read
+                    error_message = f"[ERROR READING FILE: {relative_path} - {e}]\n\n"
+                    total_length += len(error_message)
+                    outfile.write(error_message)
+
+    # Prepend the total document length to the file
+    prepend_length_comment(output_file, total_length)
+
+
+def prepend_length_comment(output_file, total_length):
+    """
+    Prepend a comment with the total document length to the output file.
+    """
+    with open(output_file, "r+", encoding="utf-8") as f:
+        content = f.read()
+        f.seek(0, 0)  # Move to the start of the file
+        f.write(f"# Total Document Length: {total_length} characters\n\n")
+        f.write(content)
+
+
+if __name__ == "__main__":
+    output_filename = "collected_scripts.txt"
+    start_folder = "langswarm"  # Specify the start folder (e.g., "/" for the root of the repository)
+    include_root = True  # Set this flag to True to include files in the repository root folder
+    print(f"Collecting scripts from '{start_folder}' into {output_filename}...")
+    collect_scripts(start_folder=start_folder, output_file=output_filename, include_root_files=include_root)
+    print(f"All scripts have been collected into {output_filename}.")
+
+
+
+--------------------------------------------------------------------------------
+File: README.md
+--------------------------------------------------------------------------------
+
+# LangSwarm-Core
+
+LangSwarm-Core is a framework designed to support multi-agent systems using Large Language Models (LLMs). It provides utilities, memory management, logging integration, and agent orchestration tools to build robust AI ecosystems with modularity and flexibility.
+
+## Features
+
+- **Agent Wrappers**: Easily integrate with LangChain, OpenAI, Hugging Face, and LlamaIndex agents.
+- **Memory Management**: Support for in-memory or external memory, with customizable options.
+- **Logging**: Seamless integration with LangSmith for advanced logging and tracing.
+- **Factory Design**: Create and manage multiple agents with configurable setups.
+- **Utilities**: Helper functions for token management, text cleaning, and cost estimation.
+- **Registry**: Centralized agent registry to manage and access agents dynamically.
+
+---
+
+## Installation
+
+### Prerequisites
+- Python 3.8 or higher
+- Install dependencies:
+  ```bash
+  pip install -r requirements.txt
+  ```
+
+### From PyPI
+  ```bash
+  pip install langswarm-core
+  ```
+
+---
+
+## Usage
+
+### Quick Start
+
+Here's an example of how to use LangSwarm-Core to create an agent and interact with it:
+
+```python
+from core.factory.agents import AgentFactory
+
+# Create a LangChain agent
+agent = AgentFactory.create(
+    name="example_agent",
+    agent_type="langchain-openai",
+    memory=[],
+    langsmith_api_key="your-langsmith-api-key",
+    model="gpt-4"
+)
+
+# Use the agent to respond to queries
+response = agent.chat("What is LangSwarm?")
+print(response)
+```
+
+### Memory Integration
+
+LangSwarm-Core supports memory out of the box. Here's how to initialize an agent with memory:
+
+```python
+from core.factory.agents import AgentFactory
+
+memory = []  # Initialize in-memory storage
+
+agent = AgentFactory.create(
+    name="memory_agent",
+    agent_type="langchain-openai",
+    memory=memory,
+    model="gpt-4"
+)
+
+response = agent.chat("Remember this: LangSwarm is awesome.")
+print(response)
+```
+
+---
+
+## Components
+
+### Wrappers
+Wrappers add modular capabilities such as:
+- Memory management (`MemoryMixin`)
+- Logging integration (`LoggingMixin`)
+
+### Utilities
+Helper functions for:
+- Token and cost estimation
+- Text processing
+- JSON and YAML validation
+
+### Factory
+Use the `AgentFactory` to easily create and configure agents:
+```python
+agent = AgentFactory.create(
+    name="example",
+    agent_type="llamaindex",
+    documents=["Sample text for indexing"]
+)
+```
+
+---
+
+## Development
+
+### Setting Up the Environment
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/aekdahl/langswarm-core.git
+   cd langswarm-core
+   ```
+2. Create a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Running Tests
+Tests are located in the `tests/` directory. Run them using `pytest`:
+```bash
+pytest
+```
+
+---
+
+## Contributing
+
+We welcome contributions! To get started:
+1. Fork the repository.
+2. Create a feature branch.
+3. Make your changes and write tests.
+4. Submit a pull request.
+
+---
+
+## Roadmap
+
+- Add support for additional LLM providers.
+- Expand orchestration capabilities with reinforcement learning agents.
+- Develop CLI tools for managing agents.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+LangSwarm-Core relies on several amazing libraries, including:
+- [LangChain](https://github.com/hwchase17/langchain)
+- [Hugging Face Transformers](https://huggingface.co/transformers/)
+- [LlamaIndex](https://github.com/jerryjliu/llama_index)
+
+---
+
+Feel free to modify this to better fit your specific project details or branding!
+
+
+
+--------------------------------------------------------------------------------
+File: collected_scripts.txt
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+File: collect_scripts.py
+--------------------------------------------------------------------------------
+
+import os
+
+# Function to write all files into a single output file
+def collect_scripts(start_folder="START_FOLDER", output_file="collected_scripts.txt", include_root_files=False):
+    # Determine the repository root and the start path
+    repo_root = os.getenv("GITHUB_WORKSPACE", os.getcwd())
+    start_path = os.path.join(repo_root, start_folder)
+
+    if not os.path.exists(start_path):
+        print(f"Error: The folder '{start_folder}' does not exist.")
+        return
+
+    total_length = 0  # Variable to track the total length of the document
+
+    with open(output_file, "w", encoding="utf-8") as outfile:
+        # Include files from the root folder of the repository if the flag is set
+        if include_root_files:
+            for file in os.listdir(repo_root):
+                file_path = os.path.join(repo_root, file)
+                if os.path.isfile(file_path) and not file.startswith("."):  # Exclude hidden files
+                    try:
+                        # Write the relative file name and path as a header
+                        relative_path = os.path.relpath(file_path, repo_root)
+                        outfile.write(f"\n{'-'*80}\n")
+                        outfile.write(f"File: {relative_path}\n")
+                        outfile.write(f"{'-'*80}\n\n")
+
+                        # Read the file content and write it
+                        with open(file_path, "r", encoding="utf-8") as infile:
+                            content = infile.read()
+                            total_length += len(content)
+                            outfile.write(content)
+                            outfile.write("\n\n")
+                    except Exception as e:
+                        # Log files that couldn't be read
+                        error_message = f"[ERROR READING FILE: {file} - {e}]\n\n"
+                        total_length += len(error_message)
+                        outfile.write(error_message)
+
+        # Walk through the specified folder and its subfolders
+        for root, _, files in os.walk(start_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, start_path)
+
+                try:
+                    # Write the relative file name and path as a header
+                    outfile.write(f"\n{'-'*80}\n")
+                    outfile.write(f"File: {relative_path}\n")
+                    outfile.write(f"{'-'*80}\n\n")
+
+                    # Read the file content and write it
+                    with open(file_path, "r", encoding="utf-8") as infile:
+                        content = infile.read()
+                        total_length += len(content)
+                        outfile.write(content)
+                        outfile.write("\n\n")
+                except Exception as e:
+                    # Log files that couldn't be read
+                    error_message = f"[ERROR READING FILE: {relative_path} - {e}]\n\n"
+                    total_length += len(error_message)
+                    outfile.write(error_message)
+
+    # Prepend the total document length to the file
+    prepend_length_comment(output_file, total_length)
+
+
+def prepend_length_comment(output_file, total_length):
+    """
+    Prepend a comment with the total document length to the output file.
+    """
+    with open(output_file, "r+", encoding="utf-8") as f:
+        content = f.read()
+        f.seek(0, 0)  # Move to the start of the file
+        f.write(f"# Total Document Length: {total_length} characters\n\n")
+        f.write(content)
+
+
+if __name__ == "__main__":
+    output_filename = "collected_scripts.txt"
+    start_folder = "langswarm"  # Specify the start folder (e.g., "/" for the root of the repository)
+    include_root = True  # Set this flag to True to include files in the repository root folder
+    print(f"Collecting scripts from '{start_folder}' into {output_filename}...")
+    collect_scripts(start_folder=start_folder, output_file=output_filename, include_root_files=include_root)
+    print(f"All scripts have been collected into {output_filename}.")
+
+
+
+--------------------------------------------------------------------------------
+File: README.md
+--------------------------------------------------------------------------------
+
+# LangSwarm-Core
+
+LangSwarm-Core is a framework designed to support multi-agent systems using Large Language Models (LLMs). It provides utilities, memory management, logging integration, and agent orchestration tools to build robust AI ecosystems with modularity and flexibility.
+
+## Features
+
+- **Agent Wrappers**: Easily integrate with LangChain, OpenAI, Hugging Face, and LlamaIndex agents.
+- **Memory Management**: Support for in-memory or external memory, with customizable options.
+- **Logging**: Seamless integration with LangSmith for advanced logging and tracing.
+- **Factory Design**: Create and manage multiple agents with configurable setups.
+- **Utilities**: Helper functions for token management, text cleaning, and cost estimation.
+- **Registry**: Centralized agent registry to manage and access agents dynamically.
+
+---
+
+## Installation
+
+### Prerequisites
+- Python 3.8 or higher
+- Install dependencies:
+  ```bash
+  pip install -r requirements.txt
+  ```
+
+### From PyPI
+  ```bash
+  pip install langswarm-core
+  ```
+
+---
+
+## Usage
+
+### Quick Start
+
+Here's an example of how to use LangSwarm-Core to create an agent and interact with it:
+
+```python
+from core.factory.agents import AgentFactory
+
+# Create a LangChain agent
+agent = AgentFactory.create(
+    name="example_agent",
+    agent_type="langchain-openai",
+    memory=[],
+    langsmith_api_key="your-langsmith-api-key",
+    model="gpt-4"
+)
+
+# Use the agent to respond to queries
+response = agent.chat("What is LangSwarm?")
+print(response)
+```
+
+### Memory Integration
+
+LangSwarm-Core supports memory out of the box. Here's how to initialize an agent with memory:
+
+```python
+from core.factory.agents import AgentFactory
+
+memory = []  # Initialize in-memory storage
+
+agent = AgentFactory.create(
+    name="memory_agent",
+    agent_type="langchain-openai",
+    memory=memory,
+    model="gpt-4"
+)
+
+response = agent.chat("Remember this: LangSwarm is awesome.")
+print(response)
+```
+
+---
+
+## Components
+
+### Wrappers
+Wrappers add modular capabilities such as:
+- Memory management (`MemoryMixin`)
+- Logging integration (`LoggingMixin`)
+
+### Utilities
+Helper functions for:
+- Token and cost estimation
+- Text processing
+- JSON and YAML validation
+
+### Factory
+Use the `AgentFactory` to easily create and configure agents:
+```python
+agent = AgentFactory.create(
+    name="example",
+    agent_type="llamaindex",
+    documents=["Sample text for indexing"]
+)
+```
+
+---
+
+## Development
+
+### Setting Up the Environment
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/aekdahl/langswarm-core.git
+   cd langswarm-core
+   ```
+2. Create a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Running Tests
+Tests are located in the `tests/` directory. Run them using `pytest`:
+```bash
+pytest
+```
+
+---
+
+## Contributing
+
+We welcome contributions! To get started:
+1. Fork the repository.
+2. Create a feature branch.
+3. Make your changes and write tests.
+4. Submit a pull request.
+
+---
+
+## Roadmap
+
+- Add support for additional LLM providers.
+- Expand orchestration capabilities with reinforcement learning agents.
+- Develop CLI tools for managing agents.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+LangSwarm-Core relies on several amazing libraries, including:
+- [LangChain](https://github.com/hwchase17/langchain)
+- [Hugging Face Transformers](https://huggingface.co/transformers/)
+- [LlamaIndex](https://github.com/jerryjliu/llama_index)
+
+---
+
+Feel free to modify this to better fit your specific project details or branding!
+
+
+
+
+
+--------------------------------------------------------------------------------
+File: setup.cfg
+--------------------------------------------------------------------------------
+
+[metadata]
+description-file = README.md
+
+[options]
+packages = find:
+python_requires = >=3.8
+
+[options.extras_require]
+dev =
+    pytest
+    black
+    flake8
+
+
+
+--------------------------------------------------------------------------------
+File: pyproject.toml
+--------------------------------------------------------------------------------
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+
+--------------------------------------------------------------------------------
+File: MANIFEST.in
+--------------------------------------------------------------------------------
+
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include core *
+recursive-exclude __pycache__ *
+recursive-exclude *.pyc
+
+
+
+--------------------------------------------------------------------------------
+File: LICENSE
+--------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2025 Alexander Ekdahl
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software...
+
+
+
+--------------------------------------------------------------------------------
+File: setup.py
+--------------------------------------------------------------------------------
+
+from setuptools import setup, find_packages
+
+setup(
+    name="langswarm-core",
+    version="0.0.16",
+    description="A core framework for multi-agent LLM ecosystems",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/aekdahl/langswarm-core",
+    author="Alexander Ekdahl",
+    author_email="alexander.ekdahl@gmail.com",
+    license="MIT",
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+    ],
+    packages=find_packages(),
+    python_requires=">=3.8",
+    install_requires=[
+        "langchain",
+        "tiktoken",
+        "llama-index",
+        "pyyaml",
+        # Add other dependencies here
+    ],
+    extras_require={
+        "dev": ["pytest", "black", "flake8"],
+    },
+    include_package_data=True,
+    entry_points={
+        "console_scripts": [
+            # If your package includes CLI tools, specify them here.
+            # e.g., "langswarm=core.cli:main",
+        ],
+    },
+)
+
+
+
+--------------------------------------------------------------------------------
+File: requirements.txt
+--------------------------------------------------------------------------------
+
+# Supported versions of Python: 3.10, 3.11, 3.8, 3.9
+# Automatically updated by dependency_update_test.py
+
+langchain==0.2.17
+tiktoken==0.7.0
+llama-index==0.11.23
+pyyaml==6.0.2
+
+
+
+--------------------------------------------------------------------------------
+File: dependency_update_test.py
+--------------------------------------------------------------------------------
+
+import subprocess
+import requests
+import sys
+from packaging.version import Version
+
+
+def fetch_versions(package_name):
+    """
+    Fetch all available versions of a package from PyPI.
+    """
+    url = f"https://pypi.org/pypi/{package_name}/json"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        all_versions = list(response.json()["releases"].keys())
+        # Sort versions using `packaging.version.Version`
+        all_versions.sort(key=Version)
+        return all_versions
+    except requests.RequestException as e:
+        print(f"Error fetching versions for {package_name}: {e}")
+        return []
+
+
+def test_dependency_version(package, version):
+    """
+    Test if a specific version of a package can be installed.
+    """
+    try:
+        print(f"Testing {package}=={version}...")
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", f"{package}=={version}"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        print(f"{package}=={version} installed successfully!")
+        return True
+    except subprocess.CalledProcessError:
+        print(f"{package}=={version} failed.")
+        return False
+
+
+def find_oldest_compatible_version(package, versions):
+    """
+    Find the oldest compatible version of a package by testing all versions.
+    """
+    compatible_version = None
+    for version in reversed(versions):  # Test oldest versions first
+        if test_dependency_version(package, version):
+            compatible_version = version
+            break
+    return compatible_version
+
+
+def get_supported_python_versions():
+    """
+    Extract the list of supported Python versions from the requirements.txt file.
+    """
+    supported_versions = []
+    try:
+        with open("requirements.txt", "r") as f:
+            for line in f:
+                if line.startswith("# Supported versions of Python:"):
+                    supported_versions = line.strip().split(":")[1].strip().split(", ")
+                    break
+    except FileNotFoundError:
+        pass
+    return supported_versions
+
+
+def update_requirements_with_python_versions(dependency_versions, python_version, success):
+    """
+    Update the requirements.txt file with the latest compatible versions
+    and maintain only supported Python versions.
+    """
+    # Get existing supported versions
+    supported_versions = set(get_supported_python_versions())
+
+    if success:
+        supported_versions.add(python_version)  # Add the Python version if it succeeded
+    else:
+        supported_versions.discard(python_version)  # Remove the version if it failed
+
+    # Sort for consistency
+    supported_versions = sorted(supported_versions)
+
+    with open("requirements.txt", "w") as f:
+        # Add the comment about supported Python versions
+        f.write(f"# Supported versions of Python: {', '.join(supported_versions)}\n")
+        f.write("# Automatically updated by dependency_update_test.py\n\n")
+
+        # Write the compatible dependency versions
+        for package, compatible_version in dependency_versions.items():
+            f.write(f"{package}=={compatible_version}\n")
+    print("requirements.txt updated successfully with Python version support comment.")
+
+
+def main(python_version):
+    # Read dependencies from requirements.txt
+    try:
+        with open("requirements.txt", "r") as f:
+            dependencies = [line.strip().split("==")[0] for line in f if "==" in line]
+    except FileNotFoundError:
+        print("requirements.txt not found.")
+        sys.exit(1)
+
+    latest_versions = {}
+    success = True  # Track whether all tests passed
+    for package in dependencies:
+        print(f"\nFetching versions for {package}...")
+        versions = fetch_versions(package)
+        if not versions:
+            print(f"No versions found for {package}. Skipping...")
+            continue
+
+        print(f"Available versions for {package}: {versions}")
+        compatible_version = find_oldest_compatible_version(package, versions)
+        if compatible_version:
+            print(f"Oldest compatible version for {package}: {compatible_version}")
+            latest_versions[package] = compatible_version
+        else:
+            print(f"No compatible version found for {package} on Python {python_version}.")
+            success = False
+            break  # Exit the loop and mark the test as failed
+
+    # Update requirements.txt with compatible versions and supported Python versions
+    update_requirements_with_python_versions(latest_versions, python_version, success)
+
+    if not success:
+        sys.exit(1)  # Exit with failure if any dependency test failed
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python dependency_update_test.py <python_version>")
+        sys.exit(1)
+    main(sys.argv[1])
+
+
 
 --------------------------------------------------------------------------------
 File: __init__.py
@@ -18,6 +807,8 @@ File: core/__init__.py
 --------------------------------------------------------------------------------
 File: core/wrappers/memory_mixin.py
 --------------------------------------------------------------------------------
+
+from typing import Any, Optional
 
 try:
     from langchain.memory import BaseMemory
@@ -41,7 +832,7 @@ class MemoryMixin:
                 return memory
             raise ValueError("Invalid memory instance provided.")
 
-        return in_memory
+        return None
 
 
 
@@ -49,6 +840,7 @@ class MemoryMixin:
 File: core/wrappers/logging_mixin.py
 --------------------------------------------------------------------------------
 
+from typing import Any, Optional
 import logging
 
 try:
@@ -111,7 +903,9 @@ class LoggingMixin:
 File: core/wrappers/generic.py
 --------------------------------------------------------------------------------
 
-from ..bot import LLM
+from typing import Any, Optional
+
+from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
 from .logging_mixin import LoggingMixin
 from .memory_mixin import MemoryMixin
@@ -123,9 +917,8 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
     """
 
     def __init__(self, name, agent, memory=None, is_conversational=False, langsmith_api_key=None, **kwargs):
-        kwargs["name"] = name
-        kwargs["provider"] = "wrapper"
-        super().__init__(name, agent, **kwargs)
+        kwargs.pop("provider", None)  # Remove `provider` if it exists
+        super().__init__(name=name, agent=agent, provider="wrapper", **kwargs)
         
         self.logger = self._initialize_logger(name, langsmith_api_key)
         self.memory = self._initialize_memory(agent, memory, self.in_memory)
@@ -144,8 +937,10 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
         Returns:
         - str: The agent's response.
         """
-        if reset and self.memory:
-            self.memory.clear()
+        if reset:
+            self.in_memory = []
+            if self.memory and hasattr(self.memory, clear):
+                self.memory.clear()
 
         if q:
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
@@ -156,7 +951,15 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
             if hasattr(self.agent, "run"):
                 # LangChain agents
                 response = self.agent.run(q)
-            elif _is_llamaindex_agent(self.agent):
+                if hasattr(self.agent, "memory") and self.agent.memory:
+                    # Memory is already managed by the agent
+                    response = self.agent.run(q)
+                else:
+                    # No memory, include context manually
+                    context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else ""
+                    full_query = f"{context}\n{q}"
+                    response = self.agent.run(full_query)
+            elif self._is_llamaindex_agent(self.agent):
                 # LlamaIndex agents
                 context = " ".join([message["content"] for message in self.in_memory])
                 response = self.agent.query(context if self.memory else q).response
@@ -164,8 +967,23 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 # Hugging Face agents
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
+            elif self._is_openai_llm(self.agent) or hasattr(self.agent, "ChatCompletion"):
+                try:
+                    completion = self.agent.ChatCompletion.create(
+                        model=self.model,
+                        messages=self.in_memory,
+                        temperature=0.0
+                    )
+                    response = completion['choices'][0]['message']['content']
+                except:
+                    completion = self.agent.chat.completions.create(
+                        model=self.model,
+                        messages=self.in_memory,
+                        temperature=0.0
+                    )
+                    response = completion.choices[0].message.content
             else:
-                raise ValueError(f"Unsupported agent type: {type(self.agent)}")
+                raise ValueError(f"Unsupported agent type: {type(self.agent)} for agent: {self.agent}")
 
             # Parse and log response
             response = self._parse_response(response)
@@ -223,6 +1041,7 @@ File: core/wrappers/base_wrapper.py
 --------------------------------------------------------------------------------
 
 from ..registry.agents import AgentRegistry
+from typing import Any, Optional
 
 class BaseWrapper:
     """
@@ -313,6 +1132,7 @@ import ast
 import uuid
 import json
 import re
+import os
 
 #%pip install --upgrade tiktoken
 import tiktoken
@@ -322,6 +1142,33 @@ class Utils:
         self.total_tokens_estimate = 0
         self.total_price_estimate = 0
         self.bot_logs = []
+
+    def _get_api_key(self, provider, api_key):
+        """
+        Retrieve the API key from environment variables or fallback to the provided key.
+
+        Args:
+            provider (str): LLM provider.
+            api_key (str): Provided API key.
+
+        Returns:
+            str: Resolved API key.
+        """
+        env_var_map = {
+            "langchain-openai": "OPENAI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "google": "GOOGLE_PALM_API_KEY",
+        }
+        env_var = env_var_map.get(provider.lower())
+
+        if env_var and (key_from_env := os.getenv(env_var)):
+            return key_from_env
+
+        if api_key:
+            return api_key
+
+        raise ValueError(f"API key for {provider} not found. Set {env_var} or pass the key explicitly.")
         
     def bot_log(self, bot, message):
         self.bot_logs.append((bot, message))
@@ -456,7 +1303,8 @@ File: core/factory/agents.py
 --------------------------------------------------------------------------------
 
 from typing import Any, Optional
-from langswarm.wrappers.agent_wrapper import AgentWrapper
+from ..wrappers.generic import AgentWrapper
+from ..utils.utilities import Utils
 
 try:
     from llama_index import GPTSimpleVectorIndex, Document
@@ -493,6 +1341,7 @@ class AgentFactory:
         - AgentWrapper: A wrapped agent ready for use.
         """
         agent = None
+        utils = Utils()
 
         if agent_type.lower() == "llamaindex":
             if GPTSimpleVectorIndex is None or Document is None:
@@ -506,13 +1355,15 @@ class AgentFactory:
             # Example: Create a LangChain agent (e.g., OpenAI model)
             from langchain.llms import OpenAI
             model = kwargs.get("model", "gpt-3.5-turbo")
-            agent = OpenAI(model=model, openai_api_key=kwargs.get("openai_api_key"))
+            api_key = utils._get_api_key('langchain-openai', kwargs.get("openai_api_key"))
+            agent = OpenAI(model=model, openai_api_key=api_key)
 
         elif agent_type.lower() == "langchain":
             # Example: Create a LangChain agent (e.g., OpenAI model)
             from langchain.llms import OpenAI
             model = kwargs.get("model", "gpt-3.5-turbo")
-            agent = OpenAI(model=model, openai_api_key=kwargs.get("openai_api_key"))
+            api_key = utils._get_api_key('langchain', kwargs.get("openai_api_key"))
+            agent = OpenAI(model=model, openai_api_key=api_key)
 
         elif agent_type.lower() == "huggingface":
             # Example: Create a Hugging Face agent
@@ -523,9 +1374,16 @@ class AgentFactory:
 
         elif agent_type.lower() == "openai":
             # Example: Create an OpenAI agent directly
-            import openai
-            agent = openai.ChatCompletion
-
+            try:
+                import openai
+            except ImportError:
+                raise ImportError(
+                    "OpenAI is not available. Please install it:\n"
+                    "  pip install openai"
+                )
+                
+            openai.api_key = utils._get_api_key('openai', kwargs.get("openai_api_key"))
+            agent = openai
         else:
             raise ValueError(f"Unsupported agent type: {agent_type}")
 
@@ -637,6 +1495,7 @@ File: core/base/bot.py
 import os
 import json
 import logging
+from types import SimpleNamespace
 
 try:
     from langchain.memory import BaseMemory
@@ -665,7 +1524,9 @@ class LLM:
         name=None, 
         team=None,
         memory=None,
-        specialization=None
+        specialization=None,
+        agent=None,
+        **kwargs
     ):
         """
         Initialize the LLM instance.
@@ -683,18 +1544,22 @@ class LLM:
             team (str): Associated team for the bot.
             specialization (str): Bot's area of expertise.
         """
+        self.agent = agent or SimpleNamespace()
+        self.provider = provider
+        self.utils = utils or Utils()
 
         if provider == 'langchain-openai':
-            self.api_key = self._get_api_key(provider, api_key)
+            self.api_key = self.utils._get_api_key(provider, api_key)
             try:
-                self.client = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
+                from langchain.chat_models import ChatOpenAI
             except ImportError:
                 raise ImportError(
                     "Neither LangChain nor OpenAI is available. Please install them:\n"
                     "  pip install langchain langchain-openai"
                 )
+            self.agent = ChatOpenAI(model=model, openai_api_key=self.api_key, temperature=temperature)
         elif provider == 'openai':
-            self.api_key = self._get_api_key(provider, api_key)
+            self.api_key = self.utils._get_api_key(provider, api_key)
             try:
                 import openai
             except ImportError:
@@ -703,15 +1568,19 @@ class LLM:
                     "  pip install openai"
                 )
             openai.api_key = self.api_key
-            self.client = openai
+            self.agent = openai
         elif provider == 'wrapper':
+            try:
+                # Used for OpenAI
+                self.agent.api_key = self.utils._get_api_key('openai', api_key)
+            except:
+                pass
             self.api_key = api_key
             team = team or 'wrappers'
         else:
             raise ValueError(f"Unsupported provider: {provider}.")
 
-        self.provider = provider
-        self.utils = utils or Utils()
+        
         self.memory = memory if not isinstance(memory, list) else None
         self.in_memory = memory if isinstance(memory, list) else []
         self.model = model
@@ -734,33 +1603,6 @@ class LLM:
             self.logger.setLevel(logging.INFO)
 
         self.logger.info("Bot logger initialized.")
-
-    def _get_api_key(self, provider, api_key):
-        """
-        Retrieve the API key from environment variables or fallback to the provided key.
-
-        Args:
-            provider (str): LLM provider.
-            api_key (str): Provided API key.
-
-        Returns:
-            str: Resolved API key.
-        """
-        env_var_map = {
-            "langchain-openai": "OPENAI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-            "google": "GOOGLE_PALM_API_KEY",
-        }
-        env_var = env_var_map.get(provider.lower())
-
-        if env_var and (key_from_env := os.getenv(env_var)):
-            return key_from_env
-
-        if api_key:
-            return api_key
-
-        raise ValueError(f"API key for {provider} not found. Set {env_var} or pass the key explicitly.")
     
     def update_system_prompt(self, system_prompt=None):
         """
@@ -777,9 +1619,9 @@ class LLM:
                 if hasattr(self.memory, "messages"):
                     messages = self.memory.messages  # Fetch current messages
                     if len(messages) > 0:
-                        messages[0] = self.system_prompt
+                        messages[0] = {"role": "system", "content": self.system_prompt}
                     else:
-                        messages = [self.system_prompt]
+                        messages = [{"role": "system", "content": self.system_prompt}]
                     self.memory.clear()       # Clear the persistent store
                     for message in messages:
                         self.memory.add_message(message)  # Re-save the updated list
@@ -790,9 +1632,9 @@ class LLM:
                 elif hasattr(self.memory, "chat_memory") and self.memory.chat_memory.messages:
                     messages = self.memory.chat_memory.messages  # Fetch current messages
                     if len(messages) > 0:
-                        messages[0] = self.system_prompt
+                        messages[0] = {"role": "system", "content": self.system_prompt}
                     else:
-                        messages = [self.system_prompt]
+                        messages = [{"role": "system", "content": self.system_prompt}]
                     self.memory.clear()       # Clear the persistent store
                     for message in messages:
                         self.memory.add_message(message)  # Re-save the updated list
@@ -805,9 +1647,9 @@ class LLM:
                     raise ValueError('The memory instance has no attribute messages.')
             else:
                 if self.in_memory and len(self.in_memory) > 0:
-                    self.in_memory[0] = self.system_prompt
+                    self.in_memory[0] = {"role": "system", "content": self.system_prompt}
                 else:
-                    self.in_memory = [self.system_prompt]
+                    self.in_memory = [{"role": "system", "content": self.system_prompt}]
                         
                 self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
             
@@ -913,16 +1755,24 @@ class LLM:
 
         if self.provider == 'langchain-openai':
             if self.memory and BaseMemory is not None and isinstance(self.memory, BaseMemory):
-                response = self.client.run(q).content
+                response = self.agent.run(q).content
             else:
-                response = self.client.invoke(self.in_memory).content
+                response = self.agent.invoke(self.in_memory).content
         elif self.provider == 'openai':
-            completion = self.client.ChatCompletion.create(
-                model=self.model,
-                messages=self.in_memory,
-                temperature=0.0
-            )
-            response = completion['choices'][0]['message']['content']
+            try:
+                completion = self.agent.ChatCompletion.create(
+                    model=self.model,
+                    messages=self.in_memory,
+                    temperature=0.0
+                )
+                response = completion['choices'][0]['message']['content']
+            except:
+                completion = self.agent.chat.completions.create(
+                    model=self.model,
+                    messages=self.in_memory,
+                    temperature=0.0
+                )
+                response = completion.choices[0].message.content
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
