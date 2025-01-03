@@ -1,4 +1,4 @@
-# Supported versions of Python:     3.11, 3.10, 3.8, 3.9
+# Supported versions of Python:      3.11, 3.10, 3.8, 3.9
 # Automatically updated by dependency_update_test.py
 
 langchain==0.2.17
