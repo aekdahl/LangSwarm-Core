@@ -16,7 +16,7 @@ def update_requirements_with_python_versions(dependency_versions, supported_pyth
 def main(python_version, supported_python_versions):
     # Read dependencies from requirements.txt
     with open("requirements.txt", "r") as f:
-        dependencies = [line.strip().split("==")[0] for line in f if "==" in line else line.strip()]
+        dependencies = [line.strip().split("==")[0] for line in f if "==" in line]
 
     latest_versions = {}
     for package in dependencies:
