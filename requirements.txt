@@ -1,4 +1,7 @@
-langchain==0.0.0
-tiktoken==0.0.0
-llama-index==0.0.0
-pyyaml==0.0.0
+# Supported versions of Python: 3.11
+# Automatically updated by dependency_update_test.py
+
+langchain==0.3.13
+tiktoken==0.8.0
+llama-index==0.12.9
+pyyaml==6.0.2
