@@ -33,17 +33,19 @@ jobs:
     - name: Fetch Latest Changes
       run: git fetch origin main
 
-    - name: Stash Unstaged Changes
+    - name: Attempt to Merge
       run: |
-        git stash --include-untracked
-        echo "Stashed changes."
+        git merge origin/main || echo "Merge conflict detected."
 
-    - name: Rebase Local Changes
-      run: git rebase origin/main
-
-    - name: Apply Stashed Changes
-      if: success()
-      run: git stash pop || echo "No stash to apply"
+    - name: Resolve Merge Conflict
+      if: failure()  # Only run if merge fails
+      run: |
+        if grep -q "<<<<<<<" requirements.txt; then
+          echo "Conflict detected in requirements.txt. Resolving..."
+          python resolve_conflicts.py requirements.txt
+          git add requirements.txt
+          git commit -m "Resolve merge conflict by merging Python versions"
+        fi
 
     - name: Commit Updated Requirements
       run: |
