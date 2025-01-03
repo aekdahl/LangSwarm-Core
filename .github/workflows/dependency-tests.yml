@@ -30,22 +30,39 @@ jobs:
     - name: Run Dependency Update Test
       run: python dependency_update_test.py ${{ matrix.python-version }}
 
-    - name: Fetch Latest Changes
-      run: git fetch origin main
-
-    - name: Attempt to Merge
+    - name: Sync with Main (Retry Mechanism)
       run: |
-        git merge origin/main || echo "Merge conflict detected."
+        MAX_RETRIES=5
+        for ((i=1; i<=MAX_RETRIES; i++)); do
+          echo "Attempt $i to sync with main..."
+          
+          # Fetch latest changes
+          git fetch origin main
+          
+          # Try to merge
+          if git merge origin/main; then
+            echo "Merge successful on attempt $i."
+            break
+          fi
 
-    - name: Resolve Merge Conflict
-      if: failure()  # Only run if merge fails
-      run: |
-        if grep -q "<<<<<<<" requirements.txt; then
-          echo "Conflict detected in requirements.txt. Resolving..."
-          python resolve_conflicts.py requirements.txt
-          git add requirements.txt
-          git commit -m "Resolve merge conflict by merging Python versions"
-        fi
+          # Resolve conflicts if merge fails
+          if grep -q "<<<<<<<" requirements.txt; then
+            echo "Conflict detected in requirements.txt. Resolving..."
+            python resolve_conflicts.py requirements.txt
+            git add requirements.txt
+            git commit -m "Resolve merge conflict by merging Python versions"
+            git merge --continue || echo "Continuing after conflict resolution."
+          fi
+
+          # Push resolved changes
+          git push origin main || echo "Push failed. Retrying..."
+          
+          # If push fails, loop back to fetch and merge
+          if [ $i -eq $MAX_RETRIES ]; then
+            echo "Failed to sync with main after $MAX_RETRIES attempts."
+            exit 1
+          fi
+        done
 
     - name: Commit Updated Requirements
       run: |
