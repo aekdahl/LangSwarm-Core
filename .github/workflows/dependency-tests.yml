@@ -25,7 +25,7 @@ jobs:
       run: python -m pip install --upgrade pip
 
     - name: Install Dependencies for Script
-      run: pip install requests
+      run: pip install packaging requests
 
     - name: Run Dependency Update Test
       run: python dependency_update_test.py ${{ matrix.python-version }}
