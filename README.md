@@ -1,4 +1,3 @@
-```markdown
 # LangSwarm-Core
 
 LangSwarm-Core is a framework designed to support multi-agent systems using Large Language Models (LLMs). It provides utilities, memory management, logging integration, agent orchestration tools, and a factory-based approach to building robust AI ecosystems with modularity and flexibility.
@@ -9,7 +8,6 @@ LangSwarm-Core is a framework designed to support multi-agent systems using Larg
 - **Wrappers**:
   - **Memory Mixin**: Seamless in-memory or external memory integration.
   - **Logging Mixin**: Advanced logging support using LangSmith and fallback loggers.
-- **Utilities**: Helper functions for token management, cost estimation, text processing, and validation of JSON, YAML, and Python code.
 - **Registry**: A centralized agent registry for managing and accessing agents dynamically.
 - **Modular Architecture**: Easily extend the framework by implementing additional mixins, factories, or agent types.
 
@@ -126,13 +124,6 @@ pytest
 ---
 
 ## File Structure
-
-### Key Files
-- `collect_scripts.py`: Utility script to collect and aggregate all project files.
-- `dependency_update_test.py`: Tests compatibility of dependencies and updates `requirements.txt`.
-- `requirements.txt`: Lists project dependencies with supported Python versions.
-
-### Core Modules
 - `core/wrappers/`: Contains mixins for memory and logging.
 - `core/factory/`: Defines the `AgentFactory` for creating agents.
 - `core/registry/`: Manages a centralized agent registry.
@@ -154,7 +145,6 @@ We welcome contributions! To get started:
 
 - Add support for additional LLM providers.
 - Expand orchestration capabilities with reinforcement learning agents.
-- Develop CLI tools for managing agents.
 - Introduce support for dynamic task allocation and meta-agent coordination.
 
 ---
@@ -173,6 +163,4 @@ LangSwarm-Core relies on several amazing libraries, including:
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
 
 ---
-```
 
-This updated `README.md` integrates the current scripts and features of the LangSwarm-Core project while ensuring clarity and completeness. Let me know if you want to adjust or expand any section!
