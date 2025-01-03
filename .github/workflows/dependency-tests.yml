@@ -33,8 +33,17 @@ jobs:
     - name: Fetch Latest Changes
       run: git fetch origin main
 
+    - name: Stash Unstaged Changes
+      run: |
+        git stash --include-untracked
+        echo "Stashed changes."
+
     - name: Rebase Local Changes
       run: git rebase origin/main
+
+    - name: Apply Stashed Changes
+      if: success()
+      run: git stash pop || echo "No stash to apply"
 
     - name: Commit Updated Requirements
       run: |
