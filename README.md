@@ -1,15 +1,17 @@
+```markdown
 # LangSwarm-Core
 
-LangSwarm-Core is a framework designed to support multi-agent systems using Large Language Models (LLMs). It provides utilities, memory management, logging integration, and agent orchestration tools to build robust AI ecosystems with modularity and flexibility.
+LangSwarm-Core is a framework designed to support multi-agent systems using Large Language Models (LLMs). It provides utilities, memory management, logging integration, agent orchestration tools, and a factory-based approach to building robust AI ecosystems with modularity and flexibility.
 
 ## Features
 
-- **Agent Wrappers**: Easily integrate with LangChain, OpenAI, Hugging Face, and LlamaIndex agents.
-- **Memory Management**: Support for in-memory or external memory, with customizable options.
-- **Logging**: Seamless integration with LangSmith for advanced logging and tracing.
-- **Factory Design**: Create and manage multiple agents with configurable setups.
-- **Utilities**: Helper functions for token management, text cleaning, and cost estimation.
-- **Registry**: Centralized agent registry to manage and access agents dynamically.
+- **Agent Factory**: Dynamically create and configure agents for LangChain, OpenAI, Hugging Face, and LlamaIndex.
+- **Wrappers**:
+  - **Memory Mixin**: Seamless in-memory or external memory integration.
+  - **Logging Mixin**: Advanced logging support using LangSmith and fallback loggers.
+- **Utilities**: Helper functions for token management, cost estimation, text processing, and validation of JSON, YAML, and Python code.
+- **Registry**: A centralized agent registry for managing and accessing agents dynamically.
+- **Modular Architecture**: Easily extend the framework by implementing additional mixins, factories, or agent types.
 
 ---
 
@@ -76,26 +78,24 @@ print(response)
 
 ## Components
 
+### Factory
+The `AgentFactory` provides a simple interface for creating agents:
+- Supports LangChain, Hugging Face, OpenAI, and LlamaIndex agents.
+- Configurable with memory, logging, and other custom parameters.
+
 ### Wrappers
-Wrappers add modular capabilities such as:
-- Memory management (`MemoryMixin`)
-- Logging integration (`LoggingMixin`)
+Wrappers extend agent capabilities:
+- **MemoryMixin**: Adds memory management functionality.
+- **LoggingMixin**: Integrates LangSmith for advanced logging.
 
 ### Utilities
-Helper functions for:
-- Token and cost estimation
-- Text processing
-- JSON and YAML validation
+Helper functions include:
+- Token and cost estimation.
+- Text processing and cleaning.
+- JSON, YAML, and Python code validation.
 
-### Factory
-Use the `AgentFactory` to easily create and configure agents:
-```python
-agent = AgentFactory.create(
-    name="example",
-    agent_type="llamaindex",
-    documents=["Sample text for indexing"]
-)
-```
+### Registry
+The `AgentRegistry` provides a centralized way to manage and query all agents created in the system.
 
 ---
 
@@ -118,10 +118,25 @@ agent = AgentFactory.create(
    ```
 
 ### Running Tests
-Tests are located in the `tests/` directory. Run them using `pytest`:
+Run tests located in the `tests/` directory using `pytest`:
 ```bash
 pytest
 ```
+
+---
+
+## File Structure
+
+### Key Files
+- `collect_scripts.py`: Utility script to collect and aggregate all project files.
+- `dependency_update_test.py`: Tests compatibility of dependencies and updates `requirements.txt`.
+- `requirements.txt`: Lists project dependencies with supported Python versions.
+
+### Core Modules
+- `core/wrappers/`: Contains mixins for memory and logging.
+- `core/factory/`: Defines the `AgentFactory` for creating agents.
+- `core/registry/`: Manages a centralized agent registry.
+- `core/utils/`: Provides utility functions for validation, token management, and text processing.
 
 ---
 
@@ -140,6 +155,7 @@ We welcome contributions! To get started:
 - Add support for additional LLM providers.
 - Expand orchestration capabilities with reinforcement learning agents.
 - Develop CLI tools for managing agents.
+- Introduce support for dynamic task allocation and meta-agent coordination.
 
 ---
 
@@ -157,5 +173,6 @@ LangSwarm-Core relies on several amazing libraries, including:
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
 
 ---
+```
 
-Feel free to modify this to better fit your specific project details or branding!
+This updated `README.md` integrates the current scripts and features of the LangSwarm-Core project while ensuring clarity and completeness. Let me know if you want to adjust or expand any section!
