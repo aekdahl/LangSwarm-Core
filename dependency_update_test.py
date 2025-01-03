@@ -61,7 +61,7 @@ def get_supported_python_versions():
         with open("requirements.txt", "r") as f:
             for line in f:
                 if line.startswith("# Supported versions of Python:"):
-                    supported_versions = line.strip().split(":")[1].split(", ")
+                    supported_versions = line.strip().split(":")[1].strip().split(", ")
                     break
     except FileNotFoundError:
         pass
