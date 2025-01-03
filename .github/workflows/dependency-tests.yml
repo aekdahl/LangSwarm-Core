@@ -30,9 +30,11 @@ jobs:
     - name: Run Dependency Update Test
       run: python dependency_update_test.py ${{ matrix.python-version }}
 
-    - name: Sync with Main (Retry Mechanism)
+    - name: Sync with Main (Retry with Exponential Backoff)
       run: |
         MAX_RETRIES=5
+        INITIAL_WAIT=$((1 + RANDOM % 10))  # Random initial wait between 1-10 seconds
+
         for ((i=1; i<=MAX_RETRIES; i++)); do
           echo "Attempt $i to sync with main..."
           
@@ -57,7 +59,20 @@ jobs:
           # Push resolved changes
           git push origin main || echo "Push failed. Retrying..."
           
-          # If push fails, loop back to fetch and merge
+          # Calculate exponential backoff wait time
+          WAIT_TIME=$((INITIAL_WAIT * 2 ** (i - 1)))  # Exponential backoff: 1x, 2x, 4x, ...
+          MAX_WAIT=60  # Optional: Set a cap on the maximum wait time
+          if [ $WAIT_TIME -gt $MAX_WAIT ]; then
+            WAIT_TIME=$MAX_WAIT
+          fi
+
+          # Wait before the next retry
+          if [ $i -lt $MAX_RETRIES ]; then
+            echo "Waiting for $WAIT_TIME seconds before retrying..."
+            sleep $WAIT_TIME
+          fi
+
+          # If this is the last attempt and it still fails, exit with error
           if [ $i -eq $MAX_RETRIES ]; then
             echo "Failed to sync with main after $MAX_RETRIES attempts."
             exit 1
@@ -72,4 +87,4 @@ jobs:
         git commit -m "Update requirements.txt with supported Python versions" || echo "No changes to commit"
 
     - name: Push Changes
-      run: git push origin main
+      run: git push origin main || echo "Push final changes failed. Check logs."
