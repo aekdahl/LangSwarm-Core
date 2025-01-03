@@ -1,6 +1,7 @@
 import subprocess
 import requests
 import sys
+from packaging.version import Version
 
 def fetch_versions(package_name):
     """
@@ -11,7 +12,8 @@ def fetch_versions(package_name):
         response = requests.get(url)
         response.raise_for_status()
         all_versions = list(response.json()["releases"].keys())
-        all_versions.sort(key=lambda v: tuple(map(int, v.split("."))), reverse=True)  # Sort by version
+        # Sort versions using `packaging.version.Version`
+        all_versions.sort(key=Version)
         return all_versions
     except requests.RequestException as e:
         print(f"Error fetching versions for {package_name}: {e}")
