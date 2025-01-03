@@ -1,5 +1,6 @@
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 # Supported versions of Python:  3.11, 3.9
 =======
 # Supported versions of Python:  3.11, 3.11
@@ -7,9 +8,12 @@
 =======
 # Supported versions of Python:  3.11, 3.10
 >>>>>>> Stashed changes
+=======
+# Supported versions of Python:  3.11, 3.8
+>>>>>>> Stashed changes
 # Automatically updated by dependency_update_test.py
 
-langchain==0.3.13
-tiktoken==0.8.0
-llama-index==0.12.9
+langchain==0.2.17
+tiktoken==0.7.0
+llama-index==0.11.23
 pyyaml==6.0.2
