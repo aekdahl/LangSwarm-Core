@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 # Supported versions of Python:  3.11, 3.9
+=======
+# Supported versions of Python:  3.11, 3.11
+>>>>>>> Stashed changes
 # Automatically updated by dependency_update_test.py
 
 langchain==0.3.13
