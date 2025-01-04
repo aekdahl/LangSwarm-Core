@@ -15,7 +15,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
         super().__init__(name=name, agent=agent, provider="wrapper", **kwargs)
         
-        self.logger = self._initialize_logger(name, langsmith_api_key)
+        self._initialize_logger(name, agent, langsmith_api_key)  # Use LoggingMixin's method
         self.memory = self._initialize_memory(agent, memory, self.in_memory)
         self.is_conversational = is_conversational
 
@@ -39,13 +39,13 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
         if q:
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
-            self.logger.info(f"Query sent to agent {self.name}: {q}")
+            self.logger.log_event(f"Query sent to agent {self.name}: {q}", "info")
+            
 
         try:
             # Handle different agent types
             if hasattr(self.agent, "run"):
                 # LangChain agents
-                response = self.agent.run(q)
                 if hasattr(self.agent, "memory") and self.agent.memory:
                     # Memory is already managed by the agent
                     response = self.agent.run(q)
@@ -82,7 +82,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
             # Parse and log response
             response = self._parse_response(response)
-            self.logger.info(f"Agent {self.name} response: {response}")
+            self.logger.log_event(f"Agent {self.name} response: {response}", "info")
 
             if erase_query:
                 self.remove()
@@ -91,6 +91,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
         except Exception as e:
             self._log_error(str(e))
+            self.logger.log_event(f"Error for agent {self.name}: {str(e)}", "error")
             raise
 
     def _parse_response(self, response: Any) -> str:
