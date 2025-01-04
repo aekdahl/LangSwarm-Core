@@ -8,6 +8,9 @@ on:
     branches:
       - main      # Runs on pushes to the main branch
 
+env:
+  OPENAI_API_KEY_TEST: ${{ secrets.OPENAI_API_KEY_TEST }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
