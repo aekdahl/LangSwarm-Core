@@ -28,7 +28,7 @@ jobs:
           pip install pytest
 
       - name: Run tests
-        run: pytest tests/
+        run: pytest langswarm/tests/
         
   publish:
     runs-on: ubuntu-latest
