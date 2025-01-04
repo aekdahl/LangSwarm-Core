@@ -156,12 +156,17 @@ class LLM:
         - content (str): The message content.
         """
         if self.memory and hasattr(self.memory, "save_context"):
+            if hasattr(self.memory, "input_key"):
+                self.memory.input_key = self.memory.input_key or "input"
+            if hasattr(self.memory, "output_key"):
+                self.memory.output_key = self.memory.output_key or "output"
+
             if role == "user":
-                self.memory.save_context(inputs={"input": content}, outputs={})
+                self.memory.save_context(inputs={self.memory.input_key: content}, outputs={self.memory.output_key: ""})
             elif role == "assistant":
-                self.memory.save_context(inputs={}, outputs={"output": content})
+                self.memory.save_context(inputs={self.memory.input_key: ""}, outputs={self.memory.output_key: content})
             elif role == "system":
-                self.memory.save_context(inputs={}, outputs={"output": content})
+                self.memory.save_context(inputs={self.memory.input_key: ""}, outputs={self.memory.output_key: content})
         elif self.memory and hasattr(self.memory, "add_message"):
             self.memory.add_message(role, content)
             
