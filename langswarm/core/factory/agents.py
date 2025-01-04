@@ -49,7 +49,10 @@ class AgentFactory:
 
         elif agent_type.lower() == "langchain-openai":
             # Example: Create a LangChain agent (e.g., OpenAI model)
-            from langchain.llms import OpenAI
+            try:
+                from langchain.llms import OpenAI
+            except ImportError:
+                from langchain_community.llms import OpenAI
             model = kwargs.get("model", "gpt-3.5-turbo")
             api_key = utils._get_api_key('langchain-openai', kwargs.get("openai_api_key"))
             agent = OpenAI(model=model, openai_api_key=api_key)
