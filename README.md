@@ -59,12 +59,15 @@ LangSwarm-Core supports memory out of the box. Here's how to initialize an agent
 
 ```python
 from langswarm.core.factory.agents import AgentFactory
+from langchain.memory import ConversationBufferMemory
 
 # Set environment variables
 os.environ['OPENAI_API_KEY'] = 'your-openai-api-key'
 
-memory = []  # Initialize in-memory storage
+# Define memory for the agent
+memory = ConversationBufferMemory()
 
+# Create a LangChain agent with memory using AgentFactory
 agent = AgentFactory.create(
     name="memory_agent",
     agent_type="langchain-openai",
@@ -72,11 +75,21 @@ agent = AgentFactory.create(
     model="gpt-4"
 )
 
-response = agent.chat("Remember this: LangSwarm is awesome.")
-print(response)
+# Interact with the agent
+response1 = agent.chat("What is LangSwarm-Core?")
+print(f"Agent: {response1}")
+
+response2 = agent.chat("Can you tell me more about its features?")
+print(f"Agent: {response2}")
+
+# Showcase memory retention
+response3 = agent.chat("What have we discussed so far?")
+print(f"Agent: {response3}")
 ```
 
 ### LangSmith Integration
+
+LangSwarm-Core supports LangSmith out of the box. Here's how to initialize an agent with LangSmith:
 
 ```python
 from langswarm.core.factory.agents import AgentFactory
@@ -96,6 +109,83 @@ agent = AgentFactory.create(
 response = agent.chat("What is LangSwarm?")
 print(response)
 ```
+
+### Bring your own agent
+
+LangSwarm-Core supports other agents out of the box. Here's how to wrap an external agent with LangSwarm:
+
+#### Hugging Face
+
+```python
+from transformers import pipeline
+from langswarm.core.wrappers.generic import AgentWrapper
+
+# Step 1: Create a Hugging Face pipeline
+huggingface_agent = pipeline("text-generation", model="gpt2")
+
+# Step 2: Wrap the Hugging Face agent using LangSwarm's AgentWrapper
+wrapped_agent = AgentWrapper(
+    name="my_agent",
+    agent=huggingface_agent,
+    memory=None,  # Optional: Add memory support if needed
+    is_conversational=True  # Enable conversational context if needed (only for Hugging Face)
+)
+
+# Step 3: Interact with the wrapped agent
+query = "Explain the concept of modular AI frameworks."
+response = wrapped_agent.chat(query)
+print(f"User: {query}")
+print(f"Agent: {response}")
+
+# Step 4: Add more interactions to showcase memory retention (if enabled)
+wrapped_agent.chat("Can you elaborate on the benefits of modularity?")
+response = wrapped_agent.chat("What was the initial query?")
+print(f"Agent: {response}")
+
+# Step 5: Reset the memory and start a new conversation
+wrapped_agent.chat("Let's reset and discuss LangSwarm-Core.", reset=True)
+response = wrapped_agent.chat("What is LangSwarm-Core?")
+print(f"Agent: {response}")
+```
+
+#### Hugging Face
+```python
+from langchain.llms import OpenAI
+from langchain.chains import SimpleSequentialChain, LLMChain
+from langchain.prompts import PromptTemplate
+from langswarm.core.wrappers.generic import AgentWrapper
+
+# Step 1: Create a LangChain LLM instance
+llm = OpenAI(model="gpt-3.5-turbo", openai_api_key="your-openai-api-key")
+
+# Step 2: Build a LangChain pipeline (e.g., a simple sequential chain)
+template = PromptTemplate(template="What is {topic}? Explain in detail.")
+llm_chain = LLMChain(llm=llm, prompt=template)
+
+# Step 3: Wrap the LangChain agent using LangSwarm's AgentWrapper
+wrapped_langchain_agent = AgentWrapper(
+    name="langchain_agent",
+    agent=llm_chain,
+    memory=None,  # Optionally add memory
+)
+
+# Step 4: Interact with the wrapped LangChain agent
+query = {"topic": "LangSwarm-Core"}
+response = wrapped_langchain_agent.chat(query)
+print(f"User: What is LangSwarm-Core?")
+print(f"Agent: {response}")
+
+# Step 5: Showcase conversational context (if memory is enabled)
+wrapped_langchain_agent.chat("Can you summarize your explanation?")
+response = wrapped_langchain_agent.chat("What was the topic of discussion?")
+print(f"Agent: {response}")
+
+# Step 6: Reset the agent and start a new conversation
+wrapped_langchain_agent.chat("Reset and start over.", reset=True)
+response = wrapped_langchain_agent.chat({"topic": "modular AI frameworks"})
+print(f"Agent: {response}")
+```
+
 ---
 
 ## Components
