@@ -1,5 +1,9 @@
 from setuptools import setup, find_packages
 
+# Read dependencies from requirements.txt
+with open("requirements.txt", "r") as f:
+    requirements = f.read().splitlines()
+    
 setup(
     name="langswarm-core",
     version="0.0.16",
@@ -21,13 +25,7 @@ setup(
     ],
     packages=find_packages(),
     python_requires=">=3.8",
-    install_requires=[
-        "langchain",
-        "tiktoken",
-        "llama-index",
-        "pyyaml",
-        # Add other dependencies here
-    ],
+    install_requires=requirements,
     extras_require={
         "dev": ["pytest", "black", "flake8"],
     },
