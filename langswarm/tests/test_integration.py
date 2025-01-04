@@ -1,7 +1,8 @@
+import os
+
 from langswarm.core.factory.agents import AgentFactory
 from langchain.memory import ConversationBufferMemory
 
-import os
 api_key = os.getenv("OPENAI_API_KEY_TEST")
 
 def test_full_agent_with_memory():
