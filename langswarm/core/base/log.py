@@ -1,5 +1,9 @@
 import logging
-from langsmith import LangSmithTracer
+
+try:
+    from langsmith import LangSmithTracer
+except ImportError:
+    LangSmithTracer = None
 
 class GlobalLogger:
     """
