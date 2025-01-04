@@ -26,6 +26,6 @@ class MemoryMixin:
         if memory:
             if BaseMemory and isinstance(memory, BaseMemory):
                 return memory
-            raise ValueError("Invalid memory instance provided.")
+            raise ValueError(f"Invalid memory instance provided. Memory: {memory}")
 
         return None
