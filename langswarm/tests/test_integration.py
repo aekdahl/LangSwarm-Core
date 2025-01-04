@@ -1,6 +1,9 @@
 from langswarm.core.factory.agents import AgentFactory
 from langchain.memory import ConversationBufferMemory
 
+import os
+api_key = os.getenv("OPENAI_API_KEY_TEST")
+
 def test_full_agent_with_memory():
     memory = ConversationBufferMemory()
     agent = AgentFactory.create(
@@ -8,7 +11,7 @@ def test_full_agent_with_memory():
         agent_type="langchain-openai",
         memory=memory,
         model="gpt-3.5-turbo",
-        openai_api_key="test-key"
+        openai_api_key=api_key
     )
 
     response1 = agent.chat("What is LangSwarm-Core?")
