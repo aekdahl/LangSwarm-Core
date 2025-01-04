@@ -1,10 +1,5 @@
 from typing import Any, Optional
 
-try:
-    from langchain.memory import BaseMemory
-except ImportError:
-    BaseMemory = None
-
 class MemoryMixin:
     """
     Mixin for memory management.
@@ -24,8 +19,8 @@ class MemoryMixin:
             return agent.memory
 
         if memory:
-            if BaseMemory and isinstance(memory, BaseMemory):
+            if hasattr(memory, "load_memory_variables") and hasattr(memory, "save_context"):
                 return memory
-            raise ValueError(f"Invalid memory instance provided. Memory: {memory}")
+            raise ValueError(f"Invalid memory instance provided. Memory: {str(memory)}")
 
         return None
