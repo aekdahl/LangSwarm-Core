@@ -56,3 +56,18 @@ class AgentRegistry:
         """
         if name in cls._registry:
             del cls._registry[name]
+
+    @classmethod
+    def get_agents_by_names(cls, names):
+        """
+        Retrieve agents from the registry based on a list of names.
+
+        Parameters:
+        - names (list): A list of agent names to retrieve.
+
+        Returns:
+        - list: A list of agents corresponding to the provided names. Missing names are skipped.
+        """
+        if not names:
+            return []
+        return [cls._registry[name]["agent"] for name in names if name in cls._registry]
