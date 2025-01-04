@@ -39,7 +39,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
         if q:
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
-            self.logger.log_event(f"Query sent to agent {self.name}: {q}", "info")
+            self.log_event(f"Query sent to agent {self.name}: {q}", "info")
             
 
         try:
@@ -82,7 +82,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
             # Parse and log response
             response = self._parse_response(response)
-            self.logger.log_event(f"Agent {self.name} response: {response}", "info")
+            self.log_event(f"Agent {self.name} response: {response}", "info")
 
             if erase_query:
                 self.remove()
@@ -91,7 +91,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
 
         except Exception as e:
             self._log_error(str(e))
-            self.logger.log_event(f"Error for agent {self.name}: {str(e)}", "error")
+            self.log_event(f"Error for agent {self.name}: {str(e)}", "error")
             raise
 
     def _parse_response(self, response: Any) -> str:
