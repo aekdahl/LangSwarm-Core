@@ -36,7 +36,16 @@ class GlobalLogger:
             print("LangSmith tracer added to global logger.")
 
     @classmethod
-    def log(cls, message, level="info", metadata=None):
+    def _ensure_initialized(cls):
+        """
+        Ensure that the logger is initialized. If not, initialize with default settings.
+        """
+        if cls._logger is None:
+            print("Global logger was not initialized. Initializing with default settings.")
+            cls.initialize()
+
+    @classmethod
+    def log(cls, message, level="info", name="global_log", metadata=None):
         """
         Log a message using the global logger or LangSmith if available.
 
@@ -45,12 +54,22 @@ class GlobalLogger:
         - level (str): The log level (e.g., 'info', 'error').
         - metadata (dict, optional): Metadata for LangSmith logging.
         """
+        cls._ensure_initialized()  # Ensure the logger is initialized
+
         if cls._langsmith_tracer:
-            cls._langsmith_tracer.log_success(
-                name="global_log",
-                input_data={"message": message},
-                output_data={},
-                metadata=metadata or {},
-            )
+            if level == 'error':
+                cls._langsmith_tracer.log_error(
+                    name=name,
+                    input_data={"message": message},
+                    output_data={},
+                    metadata=metadata or {"level": level},
+                )
+            else:
+                cls._langsmith_tracer.log_success(
+                    name=name,
+                    input_data={"message": message},
+                    output_data={},
+                    metadata=metadata or {"level": level},
+                )
         else:
             getattr(cls._logger, level.lower(), cls._logger.info)(message)
