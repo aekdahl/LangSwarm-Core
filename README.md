@@ -36,14 +36,15 @@ LangSwarm-Core is a framework designed to support multi-agent systems using Larg
 Here's an example of how to use LangSwarm-Core to create an agent and interact with it:
 
 ```python
-from core.factory.agents import AgentFactory
+from langswarm.core.factory.agents import AgentFactory
+
+# Set environment variables
+os.environ['OPENAI_API_KEY'] = 'your-openai-api-key'
 
 # Create a LangChain agent
 agent = AgentFactory.create(
     name="example_agent",
     agent_type="langchain-openai",
-    memory=[],
-    langsmith_api_key="your-langsmith-api-key",
     model="gpt-4"
 )
 
@@ -57,7 +58,10 @@ print(response)
 LangSwarm-Core supports memory out of the box. Here's how to initialize an agent with memory:
 
 ```python
-from core.factory.agents import AgentFactory
+from langswarm.core.factory.agents import AgentFactory
+
+# Set environment variables
+os.environ['OPENAI_API_KEY'] = 'your-openai-api-key'
 
 memory = []  # Initialize in-memory storage
 
@@ -72,6 +76,26 @@ response = agent.chat("Remember this: LangSwarm is awesome.")
 print(response)
 ```
 
+### LangSmith Integration
+
+```python
+from langswarm.core.factory.agents import AgentFactory
+
+# Set environment variables
+os.environ['OPENAI_API_KEY'] = 'your-openai-api-key'
+
+# Create a LangChain agent
+agent = AgentFactory.create(
+    name="example_agent",
+    agent_type="langchain-openai",
+    langsmith_api_key="your-langsmith-api-key",
+    model="gpt-4"
+)
+
+# Use the agent to respond to queries
+response = agent.chat("What is LangSwarm?")
+print(response)
+```
 ---
 
 ## Components
