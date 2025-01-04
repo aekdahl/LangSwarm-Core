@@ -87,6 +87,19 @@ response3 = agent.chat("What have we discussed so far?")
 print(f"Agent: {response3}")
 ```
 
+#### Customizing Memory
+To use a different LangChain memory type, you can replace ConversationBufferMemory with another memory class. For example:
+
+```python
+from langchain.memory import ConversationSummaryMemory
+
+# Create a separate LLM for memory summarization
+memory_llm = OpenAI(model="gpt-3.5-turbo", openai_api_key="your-openai-api-key")
+
+# Define the memory module using the summarization LLM
+memory = ConversationSummaryMemory(llm=memory_llm)
+```
+
 ### LangSmith Integration
 
 LangSwarm-Core supports LangSmith out of the box. Here's how to initialize an agent with LangSmith:
