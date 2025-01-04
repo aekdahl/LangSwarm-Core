@@ -2,13 +2,8 @@ from typing import Any, Optional
 import logging
 
 try:
-    from langsmith.tracers.helpers import traceable, log_error
-    from langsmith.wrappers import wrap_openai
     from langsmith import LangSmithTracer
 except ImportError:
-    traceable = None
-    log_error = None
-    wrap_openai = None
     LangSmithTracer = None
 
 
