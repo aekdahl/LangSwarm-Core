@@ -96,7 +96,6 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
             return response
 
         except Exception as e:
-            self._log_error(str(e))
             self.log_event(f"Error for agent {self.name}: {str(e)}", "error")
             raise
 
