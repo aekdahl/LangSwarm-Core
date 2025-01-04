@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, find_namespace_packages
 
 # Read dependencies from requirements.txt
 with open("requirements.txt", "r") as f:
@@ -23,7 +23,7 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
     ],
-    packages=find_packages(),
+    packages=find_namespace_packages(include=["langswarm.*"]),
     python_requires=">=3.8",
     install_requires=requirements,
     extras_require={
