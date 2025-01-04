@@ -4,11 +4,6 @@ import json
 import logging
 from types import SimpleNamespace
 
-try:
-    from langchain.memory import BaseMemory
-except ImportError:
-    BaseMemory = None  # Fallback if BaseMemory is not available
-
 from ..utils.utilities import Utils
 
 class LLM:
@@ -100,16 +95,6 @@ class LLM:
 
         self.update_system_prompt()
         self.utils.bot_log(self.name, {"role": "admin", "content": "Bot was created."})
-        
-        self.logger = logging.getLogger("LangSwarm.Bot")
-        if not self.logger.hasHandlers():
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.INFO)
-
-        self.logger.info("Bot logger initialized.")
     
     def update_system_prompt(self, system_prompt=None):
         """
@@ -123,35 +108,36 @@ class LLM:
 
         if self.system_prompt:
             if self.memory:
-                if hasattr(self.memory, "messages"):
-                    messages = self.memory.messages  # Fetch current messages
-                    if len(messages) > 0:
-                        messages[0] = {"role": "system", "content": self.system_prompt}
-                    else:
-                        messages = [{"role": "system", "content": self.system_prompt}]
-                    self.memory.clear()       # Clear the persistent store
-                    for message in messages:
-                        self.memory.add_message(message)  # Re-save the updated list
-
-                    self.in_memory = messages
+                if hasattr(self.memory, "load_memory_variables"):
+                    # Access the history as a list
+                    history_string = self.memory.load_memory_variables({})["history"]
+                    messages = [
+                        {"role": "user", "content": line.split(": ", 1)[-1]}
+                        if line.startswith("Human:")
+                        else {"role": "assistant", "content": line.split(": ", 1)[-1]}
+                        for line in history_string.split("\n")
+                        if line
+                    ] # Fetch current messages as a list
+                    
+                elif hasattr(self.memory, "messages"):
+                    messages = self.memory.messages # Fetch current messages
                     
                     self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
                 elif hasattr(self.memory, "chat_memory") and self.memory.chat_memory.messages:
                     messages = self.memory.chat_memory.messages  # Fetch current messages
-                    if len(messages) > 0:
-                        messages[0] = {"role": "system", "content": self.system_prompt}
-                    else:
-                        messages = [{"role": "system", "content": self.system_prompt}]
-                    self.memory.clear()       # Clear the persistent store
-                    for message in messages:
-                        self.memory.add_message(message)  # Re-save the updated list
-
-                    self.in_memory = messages
-                    
-                    self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
             
                 else:
                     raise ValueError('The memory instance has no attribute messages.')
+
+                if len(messages) > 0:
+                    messages[0] = {"role": "system", "content": self.system_prompt}
+                else:
+                    messages = [{"role": "system", "content": self.system_prompt}]
+                self.clear_memory()            # Clear the persistent store
+                for message in messages:
+                    self.add_message(message)  # Re-save the updated list
+                
+                self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
             else:
                 if self.in_memory and len(self.in_memory) > 0:
                     self.in_memory[0] = {"role": "system", "content": self.system_prompt}
@@ -169,7 +155,14 @@ class LLM:
         - role (str): The role of the message sender (e.g., "user", "assistant").
         - content (str): The message content.
         """
-        if self.memory:
+        if self.memory and hasattr(self.memory, "save_context"):
+            if role == "user":
+                self.memory.save_context(inputs={"input": content}, outputs={})
+            elif role == "assistant":
+                self.memory.save_context(inputs={}, outputs={"output": content})
+            elif role == "system":
+                self.memory.save_context(inputs={}, outputs={"output": content})
+        elif self.memory and hasattr(self.memory, "add_message"):
             self.memory.add_message(role, content)
             
         self.last_in_memory = content
@@ -206,32 +199,34 @@ class LLM:
         """
         
         if self.memory:
-            if hasattr(self.memory, "messages"):
+            if hasattr(self.memory, "load_memory_variables"):
+                # Access the history as a list
+                history_string = self.memory.load_memory_variables({})["history"]
+                messages = [
+                    {"role": "user", "content": line.split(": ", 1)[-1]}
+                    if line.startswith("Human:")
+                    else {"role": "assistant", "content": line.split(": ", 1)[-1]}
+                    for line in history_string.split("\n")
+                    if line
+                ] # Fetch current messages as a list
+
+            elif hasattr(self.memory, "messages"):
                 messages = self.memory.messages  # Fetch current messages
-                if index < len(messages) and len(messages) > 0:
-                    messages.pop(index)  # Remove the message
-                if query_and_response and index < len(messages) and len(messages) > 0:
-                    messages.pop(index)  # Remove the message
-                self.memory.clear()       # Clear the persistent store
-                for message in messages:
-                    self.memory.add_message(message)  # Re-save the updated list
-                
-                self.in_memory = messages
             
             elif hasattr(self.memory, "chat_memory") and self.memory.chat_memory.messages:
                 messages = self.memory.chat_memory.messages  # Fetch current messages
-                if index < len(messages) and len(messages) > 0:
-                    messages.pop(index)  # Remove the message
-                if query_and_response and index < len(messages) and len(messages) > 0:
-                    messages.pop(index)  # Remove the message
-                self.memory.clear()       # Clear the persistent store
-                for message in messages:
-                    self.memory.add_message(message)  # Re-save the updated list
-                
-                self.in_memory = messages
+
             else:
                 raise ValueError('The memory instance has no attribute messages.')
-    
+
+            if index < len(messages) and len(messages) > 0:
+                messages.pop(index)  # Remove the message
+            if query_and_response and index < len(messages) and len(messages) > 0:
+                messages.pop(index)  # Remove the message
+            self.clear_memory()            # Clear the persistent store
+            for message in messages:
+                self.add_message(message)  # Re-save the updated list
+
         elif self.in_memory and index < len(self.in_memory):
             del self.in_memory[index]
             self.utils.bot_log(self.name, {"role": "admin", "content": "Bot removed memory."})
@@ -260,12 +255,7 @@ class LLM:
         if q:
             self.add_message(q, role='user', remove_linebreaks=remove_linebreaks)
 
-        if self.provider == 'langchain-openai':
-            if self.memory and BaseMemory is not None and isinstance(self.memory, BaseMemory):
-                response = self.agent.run(q).content
-            else:
-                response = self.agent.invoke(self.in_memory).content
-        elif self.provider == 'openai':
+        if self.provider == 'openai':
             try:
                 completion = self.agent.ChatCompletion.create(
                     model=self.model,
@@ -297,7 +287,7 @@ class LLM:
         """
         Reset the LLM state, including clearing memory and reset the system prompt.
         """
-        if self.memory:
+        if self.memory and hasattr(self.memory, "clear"):
             self.memory.clear()
         
         self.utils.bot_log(self.name, {"role": "admin", "content": "Bot was reset."})
@@ -379,3 +369,17 @@ class LLM:
             
             for mem in memory:
                 self.utils.bot_log(self.name, mem)
+
+    def __getattr__(self, name):
+        """
+        Delegate undefined attributes or methods to the memory instance if available.
+
+        Parameters:
+        - name (str): The attribute or method name to delegate.
+
+        Returns:
+        - The result of the attribute/method on the memory instance, if it exists.
+        """
+        if self.memory and hasattr(self.memory, name):
+            return getattr(self.memory, name)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
