@@ -1,12 +1,14 @@
 try:
     from llama_index import GPTSimpleVectorIndex, Document
-    LLAMA_INDEX_AVAILABLE = True
 except ImportError:
-    LLAMA_INDEX_AVAILABLE = False
+    GPTSimpleVectorIndex = None
 
 class IndexingMixin:
     def __init__(self, index_path="index.json"):
-        if not LLAMA_INDEX_AVAILABLE:
+        self._indexing_is_available = True
+        
+        if GPTSimpleVectorIndex is None:
+            self._indexing_is_available = False
             self.index = None
             print("LlamaIndex not installed. Indexing features are disabled.")
             return
@@ -16,9 +18,15 @@ class IndexingMixin:
             self.index = GPTSimpleVectorIndex.load_from_disk(index_path)
         except FileNotFoundError:
             self.index = GPTSimpleVectorIndex([])
+        
 
+    @property
+    def indexing_is_available(self):
+        """Check if indexin is available."""
+        return self._indexing_is_available
+    
     def add_documents(self, docs):
-        if not LLAMA_INDEX_AVAILABLE:
+        if not self.indexing_is_available:
             print("Indexing features are unavailable.")
             return
         
@@ -27,7 +35,7 @@ class IndexingMixin:
         self.index.save_to_disk(self.index_path)
 
     def query_index(self, query_text):
-        if not LLAMA_INDEX_AVAILABLE:
+        if not self.indexing_is_available:
             print("Indexing features are unavailable.")
             return []
         
