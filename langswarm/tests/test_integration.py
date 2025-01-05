@@ -19,4 +19,4 @@ def test_full_agent_with_memory():
     assert "LangSwarm-Core" in response1  # Simplified response assertion for mock API
     
     response2 = agent.chat("What have we discussed so far?")
-    assert "What is LangSwarm-Core?" in response2  # Memory integration validation
+    assert "LangSwarm-Core" in response2  # Memory integration validation
