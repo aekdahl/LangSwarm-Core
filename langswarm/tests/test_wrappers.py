@@ -2,6 +2,8 @@ import pytest
 from langswarm.core.wrappers.generic import AgentWrapper
 
 class MockAgent:
+    __module__ = "langchain.agents.mock_agent"
+    
     def run(self, query):
         return f"Mock response to: {query}"
 
