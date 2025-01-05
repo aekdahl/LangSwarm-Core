@@ -47,23 +47,28 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
             self.log_event(f"Query sent to agent {self.name}: {q}", "info")
             
-
         try:
             # Handle different agent types
-            if hasattr(self.agent, "run"):
+            if self._is_langchain_agent(agent): # hasattr(self.agent, "run"):
                 # LangChain agents
                 if hasattr(self.agent, "memory") and self.agent.memory:
                     # Memory is already managed by the agent
                     response = self.agent.run(q)
                 else:
                     # No memory, include context manually
-                    context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else ""
-                    response = self.agent.run(context)
+                    if callable(self.agent):
+                        if self.in_memory:
+                            response = self.agent(self.in_memory).content
+                        else:
+                            response = self.agent(q)
+                    else:
+                        context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else q
+                        response = self.agent.run(context)
             elif self._is_llamaindex_agent(self.agent):
                 # LlamaIndex agents
                 context = " ".join([message["content"] for message in self.in_memory])
                 response = self.agent.query(context if self.memory else q).response
-            elif callable(self.agent):
+            elif self._is_hugging_face_agent(agent) and callable(self.agent):
                 # Hugging Face agents
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)

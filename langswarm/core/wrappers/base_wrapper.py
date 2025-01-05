@@ -46,6 +46,41 @@ class BaseWrapper:
         return hasattr(agent, "model") and "openai" in str(type(agent)).lower()
 
     @staticmethod
+    def _is_langchain_agent(agent):
+        # Check for LangChain module name
+        module_name = getattr(agent, "__module__", "")
+        if "langchain" in module_name:
+            return True
+    
+        # Check for LangChain-specific attributes
+        if hasattr(agent, "input_keys") or hasattr(agent, "output_keys"):
+            return True
+    
+        return False
+    
+    @staticmethod
+    def _is_hugging_face_agent(agent):
+        """
+        Identify if the given agent is a Hugging Face agent.
+    
+        Parameters:
+        - agent: The agent to check.
+    
+        Returns:
+        - bool: True if the agent is from Hugging Face, False otherwise.
+        """
+        # Check if the module name belongs to Hugging Face
+        module_name = getattr(agent, "__module__", "")
+        if "transformers" in module_name or "datasets" in module_name:
+            return True
+    
+        # Check for Hugging Face-specific attributes
+        if hasattr(agent, "model") and hasattr(agent, "task"):
+            return True
+    
+        return False
+
+    @staticmethod
     def _is_llamaindex_agent(agent):
         """
         Determine if the given agent is a LlamaIndex agent.
