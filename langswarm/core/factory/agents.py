@@ -54,7 +54,10 @@ class AgentFactory:
             
             # Use ChatOpenAI for chat models
             if model.lower().startswith("gpt-"):
-                from langchain.chat_models import ChatOpenAI
+                try:
+                    from langchain_openai import ChatOpenAI
+                except ImportError:
+                    from langchain.chat_models import ChatOpenAI
                 agent = ChatOpenAI(model=model, openai_api_key=api_key)
             # Use OpenAI for text models
             else:
