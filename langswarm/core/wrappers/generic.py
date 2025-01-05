@@ -58,8 +58,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 else:
                     # No memory, include context manually
                     context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else ""
-                    full_query = f"{context}\n{q}"
-                    response = self.agent.run(full_query)
+                    response = self.agent.run(context)
             elif self._is_llamaindex_agent(self.agent):
                 # LlamaIndex agents
                 context = " ".join([message["content"] for message in self.in_memory])
