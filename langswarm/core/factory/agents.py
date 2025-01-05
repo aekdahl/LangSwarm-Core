@@ -53,15 +53,18 @@ class AgentFactory:
             api_key = utils._get_api_key('langchain-openai', kwargs.get("openai_api_key"))
             
             # Use ChatOpenAI for chat models
-            if model.startswith("gpt-"):
-                from langchain.chat_models import ChatOpenAI
+            if model.lower().startswith("gpt-"):
+                try:
+                    from langchain_openai import ChatOpenAI
+                except ImportError:
+                    from langchain.chat_models import ChatOpenAI
                 agent = ChatOpenAI(model=model, openai_api_key=api_key)
             # Use OpenAI for text models
             else:
                 try:
-                    from langchain.llms import OpenAI
-                except ImportError:
                     from langchain_community.llms import OpenAI
+                except ImportError:
+                    from langchain.llms import OpenAI
                 agent = OpenAI(model=model, openai_api_key=api_key)
 
         elif agent_type.lower() == "huggingface":
