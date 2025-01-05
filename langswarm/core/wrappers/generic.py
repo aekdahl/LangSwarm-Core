@@ -46,7 +46,10 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
         if q:
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
             self.log_event(f"Query sent to agent {self.name}: {q}", "info")
-            
+
+        print(f"Input type: {type(self.in_memory)}")
+        print(f"Input data: {self.in_memory}")
+
         try:
             # Handle different agent types
             if self._is_langchain_agent(self.agent): # hasattr(self.agent, "run"):
