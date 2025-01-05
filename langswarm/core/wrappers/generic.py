@@ -60,10 +60,11 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 else:
                     # No memory, include context manually
                     if callable(self.agent):
+                        # Direct calls are deprecated, so we use .invoke() instead.
                         if self.in_memory:
-                            response = self.agent(self.in_memory).content
+                            response = self.agent.invoke(self.in_memory)
                         else:
-                            response = self.agent(q)
+                            response = self.agent.invoke(q)
                     else:
                         context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else q
                         response = self.agent.run(context)
