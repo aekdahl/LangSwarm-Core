@@ -46,10 +46,13 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
         if q:
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
             self.log_event(f"Query sent to agent {self.name}: {q}", "info")
-            
+
+        print(f"Input type: {type(self.in_memory)}")
+        print(f"Input data: {self.in_memory}")
+
         try:
             # Handle different agent types
-            if self._is_langchain_agent(agent): # hasattr(self.agent, "run"):
+            if self._is_langchain_agent(self.agent): # hasattr(self.agent, "run"):
                 # LangChain agents
                 if hasattr(self.agent, "memory") and self.agent.memory:
                     # Memory is already managed by the agent
@@ -57,10 +60,11 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 else:
                     # No memory, include context manually
                     if callable(self.agent):
+                        # Direct calls are deprecated, so we use .invoke() instead.
                         if self.in_memory:
-                            response = self.agent(self.in_memory).content
+                            response = self.agent.invoke(self.in_memory)
                         else:
-                            response = self.agent(q)
+                            response = self.agent.invoke(q)
                     else:
                         context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else q
                         response = self.agent.run(context)
@@ -68,7 +72,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
                 # LlamaIndex agents
                 context = " ".join([message["content"] for message in self.in_memory])
                 response = self.agent.query(context if self.memory else q).response
-            elif self._is_hugging_face_agent(agent) and callable(self.agent):
+            elif self._is_hugging_face_agent(self.agent) and callable(self.agent):
                 # Hugging Face agents
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
                 response = self.agent(context)
