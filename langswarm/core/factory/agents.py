@@ -47,25 +47,22 @@ class AgentFactory:
             doc_objects = [Document(text=doc) for doc in documents]
             agent = GPTSimpleVectorIndex(doc_objects)
 
-        elif agent_type.lower() == "langchain-openai":
+        elif agent_type.lower() == "langchain-openai" or agent_type.lower() == "langchain":
             # Example: Create a LangChain agent (e.g., OpenAI model)
-            try:
-                from langchain.llms import OpenAI
-            except ImportError:
-                from langchain_community.llms import OpenAI
             model = kwargs.get("model", "gpt-3.5-turbo")
             api_key = utils._get_api_key('langchain-openai', kwargs.get("openai_api_key"))
-            agent = OpenAI(model=model, openai_api_key=api_key)
-
-        elif agent_type.lower() == "langchain":
-            # Example: Create a LangChain agent (e.g., OpenAI model)
-            try:
-                from langchain.llms import OpenAI
-            except ImportError:
-                from langchain_community.llms import OpenAI
-            model = kwargs.get("model", "gpt-3.5-turbo")
-            api_key = utils._get_api_key('langchain', kwargs.get("openai_api_key"))
-            agent = OpenAI(model=model, openai_api_key=api_key)
+            
+            # Use ChatOpenAI for chat models
+            if model.startswith("gpt-"):
+                from langchain.chat_models import ChatOpenAI
+                agent = ChatOpenAI(model=model, openai_api_key=api_key)
+            # Use OpenAI for text models
+            else:
+                try:
+                    from langchain.llms import OpenAI
+                except ImportError:
+                    from langchain_community.llms import OpenAI
+                agent = OpenAI(model=model, openai_api_key=api_key)
 
         elif agent_type.lower() == "huggingface":
             # Example: Create a Hugging Face agent
