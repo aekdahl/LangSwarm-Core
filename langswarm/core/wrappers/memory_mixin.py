@@ -24,3 +24,27 @@ class MemoryMixin:
             raise ValueError(f"Invalid memory instance provided. Memory: {str(memory)}")
 
         return None
+
+    def add_user_message(self, message: str):
+        """
+        Custom logic for handling user messages before delegating to LangChain's memory.
+
+        ToDo: Add custom logic for handling in-memory.
+        """
+        print(f"Custom handling of user message: {message}")
+        if hasattr(self.memory, "chat_memory") and hasattr(self.memory.chat_memory, "add_user_message"):
+            self.memory.chat_memory.add_user_message(message)
+        else:
+            raise ValueError("Memory instance does not support user message addition.")
+
+    def add_ai_message(self, message: str):
+        """
+        Custom logic for handling AI messages before delegating to LangChain's memory.
+
+        ToDo: Add custom logic for handling in-memory.
+        """
+        print(f"Custom handling of AI message: {message}")
+        if hasattr(self.memory, "chat_memory") and hasattr(self.memory.chat_memory, "add_ai_message"):
+            self.memory.chat_memory.add_ai_message(message)
+        else:
+            raise ValueError("Memory instance does not support AI message addition.")
