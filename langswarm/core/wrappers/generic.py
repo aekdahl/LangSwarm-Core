@@ -4,9 +4,10 @@ from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
 from .logging_mixin import LoggingMixin
 from .memory_mixin import MemoryMixin
+from .indexing_mixin import IndexingMixin
 
 
-class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
+class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
     """
     A unified wrapper for LLM agents, combining memory management, logging, and LangSmith integration.
     """
@@ -18,7 +19,8 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin):
             
         if memory and hasattr(memory, "output_key"):
             memory.output_key = memory.output_key or "output"
-
+            
+        IndexingMixin.__init__(self, index_path=kwargs.get("index_path", "index.json"))
         super().__init__(name=name, agent=agent, provider="wrapper", memory=memory, **kwargs)
         
         self._initialize_logger(name, agent, langsmith_api_key)  # Use LoggingMixin's method
