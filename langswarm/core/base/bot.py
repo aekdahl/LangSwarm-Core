@@ -280,6 +280,8 @@ class LLM:
 
         if q and erase_query:
             self.remove()
+        else:
+            self.add_message(response, role='assistant', remove_linebreaks=remove_linebreaks)
 
         self.utils.bot_log(self.name, response)
 
