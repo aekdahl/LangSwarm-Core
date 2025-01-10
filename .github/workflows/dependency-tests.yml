@@ -2,6 +2,11 @@ name: Dependency Update and Compatibility Test
 
 on:
   workflow_dispatch: # Manual trigger
+    inputs:
+        branch_name:
+          description: 'Name of the branch to checkout or create'
+          required: true
+          default: 'dependency-update'
 
 jobs:
   test-3-8:
@@ -10,18 +15,26 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Create or Reuse Branch and Update from Main
+    
+    - name: Check if Branch Exists
+      id: branch_check
       run: |
-        if git show-ref --quiet refs/heads/dependency-update; then
-          git checkout dependency-update
-          git pull origin main
-        elif git ls-remote --quiet --heads origin dependency-update; then
-          git checkout -t origin/dependency-update
-          git pull origin main
+        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+          echo "branch_exists=true" >> $GITHUB_ENV
         else
-          git checkout -b dependency-update
+          echo "branch_exists=false" >> $GITHUB_ENV
         fi
+
+    - name: Create or Checkout Branch
+      run: |
+        if [ "$branch_exists" == "true" ]; then
+          echo "Branch exists. Checking out the branch."
+          git checkout ${{ github.event.inputs.branch_name }}
+          git pull origin ${{ github.event.inputs.branch_name }}
+        else
+          echo "Branch does not exist. Creating and checking out the branch."
+          git checkout -b ${{ github.event.inputs.branch_name }}
+          git push origin ${{ github.event.inputs.branch_name }}
 
     - name: Set up Python 3.8
       uses: actions/setup-python@v4
@@ -43,7 +56,7 @@ jobs:
         git config --global user.email "actions@github.com"
         git add requirements.txt
         git commit -m "Update requirements.txt for Python 3.8" || echo "No changes to commit"
-        git push origin dependency-update || echo "No changes to push"
+        git push origin ${{ github.event.inputs.branch_name }} || echo "No changes to push"
 
   test-3-9:
     needs: test-3-8
@@ -52,18 +65,26 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Create or Reuse Branch and Update from Main
+    
+    - name: Check if Branch Exists
+      id: branch_check
       run: |
-        if git show-ref --quiet refs/heads/dependency-update; then
-          git checkout dependency-update
-          git pull origin main
-        elif git ls-remote --quiet --heads origin dependency-update; then
-          git checkout -t origin/dependency-update
-          git pull origin main
+        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+          echo "branch_exists=true" >> $GITHUB_ENV
         else
-          git checkout -b dependency-update
+          echo "branch_exists=false" >> $GITHUB_ENV
         fi
+
+    - name: Create or Checkout Branch
+      run: |
+        if [ "$branch_exists" == "true" ]; then
+          echo "Branch exists. Checking out the branch."
+          git checkout ${{ github.event.inputs.branch_name }}
+          git pull origin ${{ github.event.inputs.branch_name }}
+        else
+          echo "Branch does not exist. Creating and checking out the branch."
+          git checkout -b ${{ github.event.inputs.branch_name }}
+          git push origin ${{ github.event.inputs.branch_name }}
 
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
@@ -85,7 +106,7 @@ jobs:
         git config --global user.email "actions@github.com"
         git add requirements.txt
         git commit -m "Update requirements.txt for Python 3.9" || echo "No changes to commit"
-        git push origin dependency-update || echo "No changes to push"
+        git push origin ${{ github.event.inputs.branch_name }} || echo "No changes to push"
 
   test-3-10:
     needs: test-3-9
@@ -94,18 +115,26 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Create or Reuse Branch and Update from Main
+    
+    - name: Check if Branch Exists
+      id: branch_check
       run: |
-        if git show-ref --quiet refs/heads/dependency-update; then
-          git checkout dependency-update
-          git pull origin main
-        elif git ls-remote --quiet --heads origin dependency-update; then
-          git checkout -t origin/dependency-update
-          git pull origin main
+        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+          echo "branch_exists=true" >> $GITHUB_ENV
         else
-          git checkout -b dependency-update
+          echo "branch_exists=false" >> $GITHUB_ENV
         fi
+
+    - name: Create or Checkout Branch
+      run: |
+        if [ "$branch_exists" == "true" ]; then
+          echo "Branch exists. Checking out the branch."
+          git checkout ${{ github.event.inputs.branch_name }}
+          git pull origin ${{ github.event.inputs.branch_name }}
+        else
+          echo "Branch does not exist. Creating and checking out the branch."
+          git checkout -b ${{ github.event.inputs.branch_name }}
+          git push origin ${{ github.event.inputs.branch_name }}
 
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -127,7 +156,7 @@ jobs:
         git config --global user.email "actions@github.com"
         git add requirements.txt
         git commit -m "Update requirements.txt for Python 3.10" || echo "No changes to commit"
-        git push origin dependency-update || echo "No changes to push"
+        git push origin ${{ github.event.inputs.branch_name }} || echo "No changes to push"
 
   test-3-11:
     needs: test-3-10
@@ -136,18 +165,26 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Create or Reuse Branch and Update from Main
+    
+    - name: Check if Branch Exists
+      id: branch_check
       run: |
-        if git show-ref --quiet refs/heads/dependency-update; then
-          git checkout dependency-update
-          git pull origin main
-        elif git ls-remote --quiet --heads origin dependency-update; then
-          git checkout -t origin/dependency-update
-          git pull origin main
+        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+          echo "branch_exists=true" >> $GITHUB_ENV
         else
-          git checkout -b dependency-update
+          echo "branch_exists=false" >> $GITHUB_ENV
         fi
+
+    - name: Create or Checkout Branch
+      run: |
+        if [ "$branch_exists" == "true" ]; then
+          echo "Branch exists. Checking out the branch."
+          git checkout ${{ github.event.inputs.branch_name }}
+          git pull origin ${{ github.event.inputs.branch_name }}
+        else
+          echo "Branch does not exist. Creating and checking out the branch."
+          git checkout -b ${{ github.event.inputs.branch_name }}
+          git push origin ${{ github.event.inputs.branch_name }}
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v4
@@ -169,12 +206,12 @@ jobs:
         git config --global user.email "actions@github.com"
         git add requirements.txt
         git commit -m "Update requirements.txt for Python 3.11" || echo "No changes to commit"
-        git push origin dependency-update || echo "No changes to push"
+        git push origin ${{ github.event.inputs.branch_name }} || echo "No changes to push"
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v5
       with:
         title: "Update requirements.txt for Python"
         body: "This pull request updates the requirements.txt file."
-        branch: dependency-update
+        branch: ${{ github.event.inputs.branch_name }}
         base: main
