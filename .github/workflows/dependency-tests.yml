@@ -11,6 +11,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Create or Reuse Branch and Update from Main
+      run: |
+        if git show-ref --quiet refs/heads/dependency-update; then
+          git checkout dependency-update
+          git pull origin main
+        elif git ls-remote --quiet --heads origin dependency-update; then
+          git checkout -t origin/dependency-update
+          git pull origin main
+        else
+          git checkout -b dependency-update
+        fi
+
     - name: Set up Python 3.8
       uses: actions/setup-python@v4
       with:
@@ -24,15 +36,6 @@ jobs:
 
     - name: Run Dependency Update Test
       run: python dependency_update_test.py 3.8
-
-    - name: Create or Reuse Branch and Update from Main
-      run: |
-        if git branch --list dependency-update; then
-          git checkout dependency-update
-          git pull origin main  # Update the branch with the latest changes from main
-        else
-          git checkout -b dependency-update
-        fi
 
     - name: Commit and Push Changes
       run: |
@@ -50,6 +53,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Create or Reuse Branch and Update from Main
+      run: |
+        if git show-ref --quiet refs/heads/dependency-update; then
+          git checkout dependency-update
+          git pull origin main
+        elif git ls-remote --quiet --heads origin dependency-update; then
+          git checkout -t origin/dependency-update
+          git pull origin main
+        else
+          git checkout -b dependency-update
+        fi
+
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
@@ -63,15 +78,6 @@ jobs:
 
     - name: Run Dependency Update Test
       run: python dependency_update_test.py 3.9
-
-    - name: Create or Reuse Branch and Update from Main
-      run: |
-        if git branch --list dependency-update; then
-          git checkout dependency-update
-          git pull origin main  # Update the branch with the latest changes from main
-        else
-          git checkout -b dependency-update
-        fi
 
     - name: Commit and Push Changes
       run: |
@@ -89,6 +95,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Create or Reuse Branch and Update from Main
+      run: |
+        if git show-ref --quiet refs/heads/dependency-update; then
+          git checkout dependency-update
+          git pull origin main
+        elif git ls-remote --quiet --heads origin dependency-update; then
+          git checkout -t origin/dependency-update
+          git pull origin main
+        else
+          git checkout -b dependency-update
+        fi
+
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
@@ -102,15 +120,6 @@ jobs:
 
     - name: Run Dependency Update Test
       run: python dependency_update_test.py 3.10
-
-    - name: Create or Reuse Branch and Update from Main
-      run: |
-        if git branch --list dependency-update; then
-          git checkout dependency-update
-          git pull origin main  # Update the branch with the latest changes from main
-        else
-          git checkout -b dependency-update
-        fi
 
     - name: Commit and Push Changes
       run: |
@@ -128,6 +137,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Create or Reuse Branch and Update from Main
+      run: |
+        if git show-ref --quiet refs/heads/dependency-update; then
+          git checkout dependency-update
+          git pull origin main
+        elif git ls-remote --quiet --heads origin dependency-update; then
+          git checkout -t origin/dependency-update
+          git pull origin main
+        else
+          git checkout -b dependency-update
+        fi
+
     - name: Set up Python 3.11
       uses: actions/setup-python@v4
       with:
@@ -141,15 +162,6 @@ jobs:
 
     - name: Run Dependency Update Test
       run: python dependency_update_test.py 3.11
-
-    - name: Create or Reuse Branch and Update from Main
-      run: |
-        if git branch --list dependency-update; then
-          git checkout dependency-update
-          git pull origin main  # Update the branch with the latest changes from main
-        else
-          git checkout -b dependency-update
-        fi
 
     - name: Commit and Push Changes
       run: |
