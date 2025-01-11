@@ -135,7 +135,7 @@ class LLM:
                     messages = [{"role": "system", "content": self.system_prompt}]
                 self.clear_memory()            # Clear the persistent store
                 for message in messages:
-                    self.add_message(message)  # Re-save the updated list
+                    self.add_message(message["content"], role=message["role"])  # Re-save the updated list
                 
                 self.utils.bot_log(self.name, {"role": "admin", "content": "Updated system prompt."})
             else:
@@ -230,7 +230,7 @@ class LLM:
                 messages.pop(index)  # Remove the message
             self.clear_memory()            # Clear the persistent store
             for message in messages:
-                self.add_message(message)  # Re-save the updated list
+                self.add_message(message["content"], role=message["role"])  # Re-save the updated list
 
         elif self.in_memory and index < len(self.in_memory):
             del self.in_memory[index]
