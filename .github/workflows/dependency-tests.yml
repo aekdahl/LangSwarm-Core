@@ -19,7 +19,7 @@ jobs:
     - name: Check if Branch Exists
       id: branch_check
       run: |
-        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+        if git ls-remote --heads origin ${{ github.event.inputs.branch_name }} | grep ${{ github.event.inputs.branch_name }}; then
           echo "branch_exists=true" >> $GITHUB_ENV
         else
           echo "branch_exists=false" >> $GITHUB_ENV
@@ -29,6 +29,7 @@ jobs:
       run: |
         if [ "$branch_exists" == "true" ]; then
           echo "Branch exists. Checking out the branch."
+          git fetch origin ${{ github.event.inputs.branch_name }}
           git checkout ${{ github.event.inputs.branch_name }}
           git pull origin ${{ github.event.inputs.branch_name }}
         else
@@ -70,7 +71,7 @@ jobs:
     - name: Check if Branch Exists
       id: branch_check
       run: |
-        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+        if git ls-remote --heads origin ${{ github.event.inputs.branch_name }} | grep ${{ github.event.inputs.branch_name }}; then
           echo "branch_exists=true" >> $GITHUB_ENV
         else
           echo "branch_exists=false" >> $GITHUB_ENV
@@ -80,6 +81,7 @@ jobs:
       run: |
         if [ "$branch_exists" == "true" ]; then
           echo "Branch exists. Checking out the branch."
+          git fetch origin ${{ github.event.inputs.branch_name }}
           git checkout ${{ github.event.inputs.branch_name }}
           git pull origin ${{ github.event.inputs.branch_name }}
         else
@@ -121,7 +123,7 @@ jobs:
     - name: Check if Branch Exists
       id: branch_check
       run: |
-        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+        if git ls-remote --heads origin ${{ github.event.inputs.branch_name }} | grep ${{ github.event.inputs.branch_name }}; then
           echo "branch_exists=true" >> $GITHUB_ENV
         else
           echo "branch_exists=false" >> $GITHUB_ENV
@@ -131,6 +133,7 @@ jobs:
       run: |
         if [ "$branch_exists" == "true" ]; then
           echo "Branch exists. Checking out the branch."
+          git fetch origin ${{ github.event.inputs.branch_name }}
           git checkout ${{ github.event.inputs.branch_name }}
           git pull origin ${{ github.event.inputs.branch_name }}
         else
@@ -172,7 +175,7 @@ jobs:
     - name: Check if Branch Exists
       id: branch_check
       run: |
-        if git show-ref --verify --quiet refs/heads/${{ github.event.inputs.branch_name }}; then
+        if git ls-remote --heads origin ${{ github.event.inputs.branch_name }} | grep ${{ github.event.inputs.branch_name }}; then
           echo "branch_exists=true" >> $GITHUB_ENV
         else
           echo "branch_exists=false" >> $GITHUB_ENV
@@ -182,6 +185,7 @@ jobs:
       run: |
         if [ "$branch_exists" == "true" ]; then
           echo "Branch exists. Checking out the branch."
+          git fetch origin ${{ github.event.inputs.branch_name }}
           git checkout ${{ github.event.inputs.branch_name }}
           git pull origin ${{ github.event.inputs.branch_name }}
         else
