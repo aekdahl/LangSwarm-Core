@@ -6,7 +6,7 @@ with open("requirements.txt", "r") as f:
     
 setup(
     name="langswarm-core",
-    version="0.0.18",
+    version="0.0.17",
     description="A core framework for multi-agent LLM ecosystems",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
