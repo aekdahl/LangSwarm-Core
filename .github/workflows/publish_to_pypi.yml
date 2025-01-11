@@ -7,6 +7,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.9"  # Workflow-wide variable
+  OPENAI_API_KEY_TEST: ${{ secrets.OPENAI_API_KEY_TEST }}
   
 jobs:
   test:
@@ -31,6 +32,8 @@ jobs:
           pip install pytest
 
       - name: Run tests
+        env:
+          OPENAI_API_KEY_TEST: ${{ secrets.OPENAI_API_KEY_TEST }}
         run: pytest langswarm/tests/
         
   publish:
