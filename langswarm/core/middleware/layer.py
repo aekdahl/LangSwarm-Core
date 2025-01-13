@@ -1,26 +1,64 @@
+# middleware1 = MiddlewareLayer(capability_registry=capability_registry)
+# middleware2 = MiddlewareLayer()  # Will reference the same instance as middleware1
+
+
 import re
 import signal
 import time
 from langswarm.core.log import GlobalLogger
 
+
 class MiddlewareLayer:
     """
     Middleware layer for routing agent inputs to tools, capabilities, or the agent itself.
+    Singleton implementation to ensure a single shared instance.
     """
+    _instance = None
 
-    def __init__(self, agent, capability_registry, tools=None, memory=None):
-        """
-        Initialize the middleware.
-        :param agent: The main agent.
-        :param capability_registry: CapabilityRegistry instance for managing capabilities.
-        :param tools: Dictionary of tools with their corresponding functions.
-        :param memory: Memory instance for managing context.
-        """
-        self.agent = agent
-        self.capability_registry = capability_registry
-        self.tools = tools or {}
-        self.memory = memory
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(MiddlewareLayer, cls).__new__(cls)
+        return cls._instance
 
+    def __init__(self, capability_registry=None, tools=None):
+        if not hasattr(self, "_initialized"):  # Ensures __init__ runs only once
+            self.capability_registry = capability_registry
+            self.tools = tools or {}
+            self._initialized = True  # Mark the instance as initialized
+
+    def add_tool(self, name, handler):
+        """
+        Add or update a tool.
+        :param name: str - Name of the tool.
+        :param handler: callable - The function to handle the tool's actions.
+        """
+        self.tools[name] = handler
+
+    def remove_tool(self, name):
+        """
+        Remove a tool by name.
+        :param name: str - Name of the tool to remove.
+        """
+        if name in self.tools:
+            del self.tools[name]
+
+    def add_capability(self, name, capability):
+        """
+        Add or update a capability.
+        :param name: str - Name of the capability.
+        :param capability: callable - The function or object representing the capability.
+        """
+        if self.capability_registry is not None:
+            self.capability_registry[name] = capability
+
+    def remove_capability(self, name):
+        """
+        Remove a capability by name.
+        :param name: str - Name of the capability to remove.
+        """
+        if self.capability_registry and name in self.capability_registry:
+            del self.capability_registry[name]
+            
     def process_input(self, agent_input):
         """
         Process agent input and route it appropriately.
@@ -29,17 +67,14 @@ class MiddlewareLayer:
         """
         self._log_event("Processing agent input", "info", agent_input=agent_input)
 
-        # Update memory with agent input
-        if self.memory:
-            self.memory.save_context({"agent_input": agent_input})
-
         # Detect action type
         action_details = self.parse_action(agent_input)
         if action_details:
             return self._route_action(*action_details)
 
-        # Fallback to the agent
-        return self._agent_fallback(agent_input)
+        # If no action is detected, return input unchanged
+        self._log_event("No action detected, forwarding input", "info")
+        return agent_input
 
     def parse_action(self, agent_input):
         """
@@ -113,16 +148,6 @@ class MiddlewareLayer:
         finally:
             signal.alarm(0)
 
-    def _agent_fallback(self, agent_input):
-        """
-        Fallback to the agent for unhandled inputs.
-        :param agent_input: str - The agent's input.
-        :return: str - The agent's response.
-        """
-        result = self.agent.chat(agent_input)
-        self._log_event("Agent fallback executed", "info", agent_response=result)
-        return result
-
     def _log_event(self, message, level, **metadata):
         """
         Log an event to GlobalLogger.
@@ -130,4 +155,7 @@ class MiddlewareLayer:
         :param level: str - Log level.
         :param metadata: dict - Additional log metadata.
         """
-        GlobalLogger.log_event(message=message, level=level, name="middleware", metadata=metadata)
+        if GlobalLogger.is_initialized():
+            GlobalLogger.log_event(message=message, level=level, name="middleware", metadata=metadata)
+        else:
+            print(f"[Fallback Logger] {level.upper()}: {message} - {metadata}")
