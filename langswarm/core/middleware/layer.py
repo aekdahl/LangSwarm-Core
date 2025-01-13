@@ -1,7 +1,3 @@
-# middleware1 = MiddlewareLayer(capability_registry=capability_registry)
-# middleware2 = MiddlewareLayer()  # Will reference the same instance as middleware1
-
-
 import re
 import signal
 import time
@@ -58,23 +54,27 @@ class MiddlewareLayer:
         """
         if self.capability_registry and name in self.capability_registry:
             del self.capability_registry[name]
-            
+
     def process_input(self, agent_input):
         """
         Process agent input and route it appropriately.
         :param agent_input: str - The agent's input.
-        :return: str - The result from a tool, capability, or the agent itself.
+        :return: Tuple[int, str] - (status_code, result).
         """
         self._log_event("Processing agent input", "info", agent_input=agent_input)
 
-        # Detect action type
-        action_details = self.parse_action(agent_input)
-        if action_details:
-            return self._route_action(*action_details)
+        try:
+            # Detect action type
+            action_details = self.parse_action(agent_input)
+            if action_details:
+                return self._route_action(*action_details)
 
-        # If no action is detected, return input unchanged
-        self._log_event("No action detected, forwarding input", "info")
-        return agent_input
+            # If no action is detected, return input unchanged
+            self._log_event("No action detected, forwarding input", "info")
+            return 200, agent_input  # 200 indicates agent_input forwarded
+        except Exception as e:
+            self._log_event(f"Error processing input: {e}", "error", agent_input=agent_input)
+            return 500, agent_input
 
     def parse_action(self, agent_input):
         """
@@ -104,7 +104,7 @@ class MiddlewareLayer:
         :param action_type: str - Type of action (tool or capability).
         :param action_name: str - Name of the action.
         :param params: dict - Parameters for the action.
-        :return: str - The result of the action.
+        :return: Tuple[int, str] - (status_code, result).
         """
         handler = None
 
@@ -114,10 +114,11 @@ class MiddlewareLayer:
             handler = self.capability_registry.get_capability(action_name)
 
         if handler:
-            return self._execute_with_timeout(handler, params)
+            result = self._execute_with_timeout(handler, params)
+            return 201, result  # 201 indicates success from tool/capability
 
         self._log_event(f"Action not found: {action_name}", "error")
-        return f"{action_type.capitalize()} '{action_name}' not found."
+        return 404, f"{action_type.capitalize()} '{action_name}' not found."
 
     def _execute_with_timeout(self, handler, params, timeout=10):
         """
@@ -155,7 +156,4 @@ class MiddlewareLayer:
         :param level: str - Log level.
         :param metadata: dict - Additional log metadata.
         """
-        if GlobalLogger.is_initialized():
-            GlobalLogger.log_event(message=message, level=level, name="middleware", metadata=metadata)
-        else:
-            print(f"[Fallback Logger] {level.upper()}: {message} - {metadata}")
+        GlobalLogger.log_event(message=message, level=level, name="middleware", metadata=metadata)
