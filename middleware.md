@@ -226,3 +226,213 @@ print(response)
 
 Would you like additional details or refinements for this implementation?
 
+
+
+---
+
+
+
+# Middleware Layer Implementation for LangSwarm-Core
+
+## Overview
+The Middleware layer is designed to analyze agent inputs, dynamically route actions to tools or capabilities, and provide fallback to agents. This implementation includes refined parsing, context management, timeout handling, and logging integration with GlobalLogger.
+
+---
+
+### **Implementation**
+
+#### **middleware_layer.py**
+```python
+import re
+import signal
+import time
+from langswarm.logging.global_logger import GlobalLogger
+
+class MiddlewareLayer:
+    """
+    Middleware layer for routing agent inputs to tools, capabilities, or the agent itself.
+    """
+
+    def __init__(self, agent, capability_registry, tools=None, memory=None):
+        """
+        Initialize the middleware.
+        :param agent: The main agent.
+        :param capability_registry: CapabilityRegistry instance for managing capabilities.
+        :param tools: Dictionary of tools with their corresponding functions.
+        :param memory: Memory instance for managing context.
+        """
+        self.agent = agent
+        self.capability_registry = capability_registry
+        self.tools = tools or {}
+        self.memory = memory
+
+    def process_input(self, agent_input):
+        """
+        Process agent input and route it appropriately.
+        :param agent_input: str - The agent's input.
+        :return: str - The result from a tool, capability, or the agent itself.
+        """
+        self._log_event("Processing agent input", "info", agent_input=agent_input)
+
+        # Update memory with agent input
+        if self.memory:
+            self.memory.save_context({"agent_input": agent_input})
+
+        # Detect action type
+        action_details = self.parse_action(agent_input)
+        if action_details:
+            return self._route_action(*action_details)
+
+        # Fallback to the agent
+        return self._agent_fallback(agent_input)
+
+    def parse_action(self, agent_input):
+        """
+        Parse agent input to detect tools or capabilities.
+        :param agent_input: str - The agent's input.
+        :return: Tuple[str, str, dict] or None - (action_type, action_name, params).
+        """
+        tool_match = re.match(r"use tool:\s*(\w+)\s*({.*})", agent_input)
+        capability_match = re.match(r"use capability:\s*(\w+)\s*({.*})", agent_input)
+
+        try:
+            if tool_match:
+                action_name, params = tool_match.groups()
+                return "tool", action_name.strip(), eval(params)
+
+            if capability_match:
+                action_name, params = capability_match.groups()
+                return "capability", action_name.strip(), eval(params)
+        except (SyntaxError, ValueError) as e:
+            self._log_event(f"Failed to parse action: {e}", "warning")
+
+        return None
+
+    def _route_action(self, action_type, action_name, params):
+        """
+        Route actions to the appropriate handler.
+        :param action_type: str - Type of action (tool or capability).
+        :param action_name: str - Name of the action.
+        :param params: dict - Parameters for the action.
+        :return: str - The result of the action.
+        """
+        handler = None
+
+        if action_type == "tool":
+            handler = self.tools.get(action_name)
+        elif action_type == "capability":
+            handler = self.capability_registry.get_capability(action_name)
+
+        if handler:
+            return self._execute_with_timeout(handler, params)
+
+        self._log_event(f"Action not found: {action_name}", "error")
+        return f"{action_type.capitalize()} '{action_name}' not found."
+
+    def _execute_with_timeout(self, handler, params, timeout=10):
+        """
+        Execute a handler with a timeout.
+        :param handler: callable - The action handler.
+        :param params: dict - Parameters for the handler.
+        :param timeout: int - Timeout in seconds.
+        :return: str - The result of the handler.
+        """
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Action execution timed out.")
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout)
+
+        try:
+            start_time = time.time()
+            result = handler(**params)
+            execution_time = time.time() - start_time
+            self._log_event("Action executed successfully", "info", execution_time=execution_time)
+            return result
+        except TimeoutError:
+            self._log_event("Action execution timed out", "error")
+            return "The action timed out."
+        except Exception as e:
+            self._log_event(f"Error executing action: {e}", "error")
+            return f"An error occurred: {e}"
+        finally:
+            signal.alarm(0)
+
+    def _agent_fallback(self, agent_input):
+        """
+        Fallback to the agent for unhandled inputs.
+        :param agent_input: str - The agent's input.
+        :return: str - The agent's response.
+        """
+        result = self.agent.chat(agent_input)
+        self._log_event("Agent fallback executed", "info", agent_response=result)
+        return result
+
+    def _log_event(self, message, level, **metadata):
+        """
+        Log an event to GlobalLogger.
+        :param message: str - Log message.
+        :param level: str - Log level.
+        :param metadata: dict - Additional log metadata.
+        """
+        GlobalLogger.log_event(message=message, level=level, name="middleware", metadata=metadata)
+```
+
+---
+
+### **Test Middleware Layer**
+#### **test_middleware_layer.py**
+```python
+import pytest
+from langswarm.middleware.middleware_layer import MiddlewareLayer
+from unittest.mock import Mock
+
+@pytest.fixture
+def mock_agent():
+    agent = Mock()
+    agent.chat.return_value = "Agent response."
+    return agent
+
+@pytest.fixture
+def mock_capability_registry():
+    registry = Mock()
+    registry.get_capability.return_value.run = Mock(return_value="Capability executed.")
+    return registry
+
+@pytest.fixture
+def middleware(mock_agent, mock_capability_registry):
+    return MiddlewareLayer(agent=mock_agent, capability_registry=mock_capability_registry, tools={
+        "search_tool": lambda query: f"Searching for: {query}"
+    })
+
+def test_tool_routing(middleware):
+    response = middleware.process_input("use tool: search_tool {\"query\": \"AI trends\"}")
+    assert response == "Searching for: AI trends"
+
+def test_capability_routing(middleware):
+    response = middleware.process_input("use capability: test_capability {\"key\": \"value\"}")
+    assert response == "Capability executed."
+
+def test_agent_fallback(middleware):
+    response = middleware.process_input("Tell me about AI.")
+    assert response == "Agent response."
+
+def test_action_timeout(middleware):
+    def slow_tool(**params):
+        time.sleep(11)
+        return "Finished."
+
+    middleware.tools["slow_tool"] = slow_tool
+    response = middleware.process_input("use tool: slow_tool {\"param\": \"test\"}")
+    assert response == "The action timed out."
+```
+
+---
+
+### **Next Steps**
+1. **Advanced Parsing**: Extend `parse_action` to use NLP-based parsing.
+2. **Cortex Feedback Integration**: Incorporate feedback from Cortex for further optimization.
+3. **Enhanced Observability**: Add metrics collection for monitoring middleware performance.
+
+Let me know if further refinements are needed! 🚀
+
