@@ -7,6 +7,8 @@ from .memory_mixin import MemoryMixin
 from .indexing_mixin import IndexingMixin
 from ..middleware.layer import MiddlewareLayer
 
+# import the langswarm.memory features for RAG
+# If not available, RAG and thereby also tools will not be available..
 
 class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
     """
@@ -131,6 +133,10 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
         middleware_response = ""
         if q:
             # RAG IMPLEMENTATION
+            # - Retrieve General information
+            # - Retrieve usable tools
+            # - Retrieve usable capabilities (later)
+            # - Possibly use one multisource RAG instead of three separate.
             if self.indexing_is_available:
                 results = self.query_index(q)
                 rag = "\n".join([res["text"] for res in results]) if results else ""
