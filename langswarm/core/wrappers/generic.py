@@ -39,40 +39,12 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
         self.tools = tools or {}
         self.middleware = MiddlewareLayer(capability_registry=None, tools=self.tools)  # Middleware initialized with tools
 
-    def chat(self, q=None, reset=False, erase_query=False, remove_linebreaks=False):
-        """
-        Process a query using the wrapped agent.
-
-        Parameters:
-        - q (str): Query string.
-        - reset (bool): Whether to reset memory before processing.
-        - erase_query (bool): Whether to erase the query after processing.
-        - remove_linebreaks (bool): Remove line breaks from the query.
-
-        Returns:
-        - str: The agent's response.
-        """
-        if reset:
-            self.in_memory = []
-            if self.memory and hasattr(self.memory, clear):
-                self.memory.clear()
+    def _call_agent(self, q, erase_query=False, remove_linebreaks=False):
 
         if q:
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
             self.log_event(f"Query sent to agent {self.name}: {q}", "info")
-
-        # RAG IMPLEMENTATION
-        rag = ""
-        if self.indexing_is_available:
-            results = self.query_index(query_text)
-            rag = "\n".join([res["text"] for res in results]) if results else ""
-
-        # IMPLEMENT TOOLS HERE...
-        # Pass query to middleware
-        #middleware_result, response = self.middleware.process_input(q)
-        #if middleware_result == 200:  # Middleware handled successfully
-        #    return response
-                
+            
         try:
             # Handle different agent types
             if self._is_langchain_agent(self.agent): # hasattr(self.agent, "run"):
@@ -121,14 +93,60 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
             response = self._parse_response(response)
             self.log_event(f"Agent {self.name} response: {response}", "info")
 
-            if erase_query:
-                self.remove()
+            if q and erase_query:
+                self.remove():
+            elif q:
+                self.add_message(response, role="assistant", remove_linebreaks=remove_linebreaks)
+                self.log_event(f"Response sent back from Agent {self.name}: {response}", "info")
 
             return response
 
         except Exception as e:
             self.log_event(f"Error for agent {self.name}: {str(e)}", "error")
             raise
+        
+    def chat(self, q=None, reset=False, erase_query=False, remove_linebreaks=False):
+        """
+        Process a query using the wrapped agent.
+
+        Parameters:
+        - q (str): Query string.
+        - reset (bool): Whether to reset memory before processing.
+        - erase_query (bool): Whether to erase the query after processing.
+        - remove_linebreaks (bool): Remove line breaks from the query.
+
+        Returns:
+        - str: The agent's response.
+        """
+        response = "No Query was submitted."
+        
+        if reset:
+            self.in_memory = []
+            if self.memory and hasattr(self.memory, clear):
+                self.memory.clear()
+
+        rag = ""
+        middleware_response = ""
+        if q:
+            # RAG IMPLEMENTATION
+            if self.indexing_is_available:
+                results = self.query_index(q)
+                rag = "\n".join([res["text"] for res in results]) if results else ""
+                if rag != "":
+                    rag = "\n\nRETRIEVED INFORMATION\n\n"+rag
+        
+            # ToDo: Figure out if RAG should be included when sending to middleware
+        
+            q = "\n\nINITIAL QUERY\n\n"+q
+            response = self._call_agent(self, rag+q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
+
+            # MIDDLEWARE IMPLEMENTATION
+            middleware_result, middleware_response = self.middleware.process_input(response)
+            if middleware_result == 201:  # Middleware used tool or capability successfully
+                middleware_response = "\n\nTOOL OR CAPABILITY OUTPUT\n\n"+middleware_response
+                response = self._call_agent(middleware_response+rag+q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
+
+    return response
 
     def _parse_response(self, response: Any) -> str:
         """
