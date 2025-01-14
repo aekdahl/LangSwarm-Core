@@ -1,10 +1,11 @@
-from typing import Any, Optional
+from typing import Any, Optional, Dict, Callable
 
 from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
 from .logging_mixin import LoggingMixin
 from .memory_mixin import MemoryMixin
 from .indexing_mixin import IndexingMixin
+from ..middleware.layer import MiddlewareLayer
 
 
 class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
@@ -12,7 +13,16 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
     A unified wrapper for LLM agents, combining memory management, logging, and LangSmith integration.
     """
 
-    def __init__(self, name, agent, memory=None, is_conversational=False, langsmith_api_key=None, **kwargs):
+    def __init__(
+        self, 
+        name, 
+        agent, 
+        memory=None, 
+        is_conversational=False, 
+        langsmith_api_key=None, 
+        tools: Optional[Dict[str, Callable]] = None,
+        **kwargs
+    ):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
         if memory and hasattr(memory, "input_key"):
             memory.input_key = memory.input_key or "input"
@@ -26,6 +36,8 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
         self._initialize_logger(name, agent, langsmith_api_key)  # Use LoggingMixin's method
         self.memory = self._initialize_memory(agent, memory, self.in_memory)
         self.is_conversational = is_conversational
+        self.tools = tools or {}
+        self.middleware = MiddlewareLayer(capability_registry=None, tools=self.tools)  # Middleware initialized with tools
 
     def chat(self, q=None, reset=False, erase_query=False, remove_linebreaks=False):
         """
@@ -49,9 +61,18 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
             self.add_message(q, role="user", remove_linebreaks=remove_linebreaks)
             self.log_event(f"Query sent to agent {self.name}: {q}", "info")
 
-        print(f"Input type: {type(self.in_memory)}")
-        print(f"Input data: {self.in_memory}")
+        # RAG IMPLEMENTATION
+        rag = ""
+        if self.indexing_is_available:
+            results = self.query_index(query_text)
+            rag = "\n".join([res["text"] for res in results]) if results else ""
 
+        # IMPLEMENT TOOLS HERE...
+        # Pass query to middleware
+        #middleware_result, response = self.middleware.process_input(q)
+        #if middleware_result == 200:  # Middleware handled successfully
+        #    return response
+                
         try:
             # Handle different agent types
             if self._is_langchain_agent(self.agent): # hasattr(self.agent, "run"):
