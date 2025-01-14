@@ -21,6 +21,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
         is_conversational=False, 
         langsmith_api_key=None, 
         tools: Optional[Dict[str, Callable]] = None,
+        capabilities: Optional[Dict[str, Callable]] = None,
         **kwargs
     ):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
@@ -37,7 +38,8 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
         self.memory = self._initialize_memory(agent, memory, self.in_memory)
         self.is_conversational = is_conversational
         self.tools = tools or {}
-        self.middleware = MiddlewareLayer(capability_registry=None, tools=self.tools)  # Middleware initialized with tools
+        self.capabilities = capabilities or {}
+        self.middleware = MiddlewareLayer(capability_registry=self.capabilities, tools=self.tools)  # Middleware initialized
 
     def _call_agent(self, q, erase_query=False, remove_linebreaks=False):
 
