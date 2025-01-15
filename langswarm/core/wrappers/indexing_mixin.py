@@ -1,6 +1,11 @@
 from typing import Dict, List
-from langswarm.memory import ChromaDBAdapter
-from langswarm.base.database_adapter import DatabaseAdapter
+
+try:
+    from langswarm.memory import ChromaDBAdapter
+    from langswarm.base.database_adapter import DatabaseAdapter
+except ImportError:
+    ChromaDBAdapter = None
+    DatabaseAdapter = None
 
 
 class IndexingMixin:
@@ -8,29 +13,24 @@ class IndexingMixin:
     Mixin to handle multiple indices and backends for indexing and querying.
     Supports pluggable adapters for different backends, with a fallback to local ChromaDB.
     """
-    def __init__(self, default_index_name="default", chromadb_directory="chroma_data"):
+    def __init__(self):
         """
-        Initialize the IndexingMixin with optional default local ChromaDB.
+        Initialize the IndexingMixin with optional default local ChromaDB in-memory.
 
         :param default_index_name: str - Name of the default index.
         :param chromadb_directory: str - Directory for local ChromaDB storage.
         """
-        self.adapters = {}
         self.indices = {}
-        self._default_index_name = default_index_name
+        self._default_indices = "__default"
         self._indexing_is_available = True
 
         # Attempt to initialize fallback ChromaDB adapter
-        try:
-            self._local_chromadb_adapter = ChromaDBAdapter(
-                collection_name=self._default_index_name,
-                persist_directory=chromadb_directory,
+        if all(var is not None for var in (ChromaDBAdapter, DatabaseAdapter)):
+            self.indices[self._default_indices] = ChromaDBAdapter(
+                collection_name=self._default_indices
             )
-            self.adapters["local_chroma"] = self._local_chromadb_adapter
-            self.indices[default_index_name] = self._local_chromadb_adapter
-        except ImportError:
+        else:
             self._indexing_is_available = False
-            self._local_chromadb_adapter = None
             print(
                 "ChromaDB is not installed. Indexing features are disabled. "
                 "Please install ChromaDB or add a compatible adapter to enable indexing."
@@ -41,34 +41,22 @@ class IndexingMixin:
         """Check if indexing is available."""
         return self._indexing_is_available
 
-    def add_adapter(self, adapter_name: str, adapter: DatabaseAdapter):
+    def add_index(self, index_name: str, adapter: DatabaseAdapter):
         """
         Add a new backend adapter.
 
-        :param adapter_name: str - Name of the adapter.
+        :param index_name: str - Name of the index.
         :param adapter: DatabaseAdapter - The adapter instance.
         """
         if not isinstance(adapter, DatabaseAdapter):
             raise ValueError("Adapter must inherit from DatabaseAdapter.")
-        self.adapters[adapter_name] = adapter
+        
+        if index_name in self.indices:
+            raise ValueError("Index name already exists. Set another index name.")
+            
+        self.indices[index_name] = adapter
         self._indexing_is_available = True
-        print(f"Adapter '{adapter_name}' added successfully.")
-
-    def create_index(self, index_name: str, adapter_name: str):
-        """
-        Create a new index using the specified adapter.
-
-        :param index_name: str - Name of the index.
-        :param adapter_name: str - Name of the adapter to use.
-        """
-        if not self.indexing_is_available:
-            print("Indexing features are unavailable.")
-            return
-
-        if adapter_name not in self.adapters:
-            raise ValueError(f"Adapter '{adapter_name}' is not registered.")
-        self.indices[index_name] = self.adapters[adapter_name]
-        print(f"Index '{index_name}' created using adapter '{adapter_name}'.")
+        print(f"Index '{index_name}' added successfully.")
 
     def add_documents(self, docs: List[Dict], index_name=None):
         """
@@ -125,7 +113,7 @@ class IndexingMixin:
             return
 
         adapter = self.indices.pop(index_name)
-        adapter.delete({"identifier": index_name})
+        # adapter.delete({"identifier": index_name}) --> ToDo: Adapter do not support deleting full indices yet..
         print(f"Index '{index_name}' deleted.")
 
     def list_indices(self):
