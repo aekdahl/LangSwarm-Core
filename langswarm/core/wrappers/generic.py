@@ -134,16 +134,25 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, IndexingMixin):
         if q:
             # RAG IMPLEMENTATION
             # - Retrieve General information
-            # - Retrieve usable tools
-            # - Retrieve usable capabilities (later)
-            # - Possibly use one multisource RAG instead of three separate.
             if self.indexing_is_available:
                 results = self.query_index(q)
                 rag = "\n".join([res["text"] for res in results]) if results else ""
                 if rag != "":
                     rag = "\n\nRETRIEVED INFORMATION\n\n"+rag
-        
-            # ToDo: Figure out if RAG should be included when sending to middleware
+                    
+            # - Retrieve usable tools
+            if self.indexing_is_available:
+                results = self.query_index(q)
+                rag_tools = "\n".join([res["text"] for res in results]) if results else ""
+                if rag_tools != "":
+                    rag = "\n\nAVAILABLE TOOLS\n\n"+rag_tools+rag
+                    
+            # - Retrieve usable capabilities (later)
+            if self.indexing_is_available:
+                results = self.query_index(q)
+                rag_capabilities = "\n".join([res["text"] for res in results]) if results else ""
+                if rag_capabilities != "":
+                    rag = "\n\nAVAILABLE CAPABILITIES\n\n"+rag_capabilities+rag
         
             q = "\n\nINITIAL QUERY\n\n"+q
             response = self._call_agent(self, rag+q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
