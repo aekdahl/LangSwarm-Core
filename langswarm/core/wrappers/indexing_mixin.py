@@ -21,7 +21,7 @@ class IndexingMixin:
         :param chromadb_directory: str - Directory for local ChromaDB storage.
         """
         self.indices = {}
-        self._default_indices = "__default"
+        self._default_indices = "ls__default"
         self._indexing_is_available = True
 
         # Attempt to initialize fallback ChromaDB adapter
