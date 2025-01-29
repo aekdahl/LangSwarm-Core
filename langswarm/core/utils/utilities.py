@@ -176,7 +176,7 @@ class Utils:
 
     def is_valid_yaml(self, code):
         try:
-            yaml.load(code)
+            yaml.safe_load(code)
         except yaml.YAMLError:
             return False
 
