@@ -1,0 +1,1 @@
+HelloWorld = """You are a helpful professional assistant."""
