@@ -48,7 +48,16 @@ class Utils:
         raise ValueError(f"API key for {provider} not found. Set {env_var} or pass the key explicitly.")
         
     def bot_log(self, bot, message):
-        self.bot_logs.append((bot, message))
+    """
+    Logs a message related to a specific bot.
+
+    This method appends a tuple containing the bot identifier and the message string to the bot_logs list.
+
+    Args:
+        bot: An identifier for the bot that the message is related to.
+        message: The log message to record.
+    """
+    self.bot_logs.append((bot, message))
 
     def print_current_estimates(self):
         print('Estimated total tokens:', self.total_tokens_estimate)
