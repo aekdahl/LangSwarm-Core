@@ -60,6 +60,14 @@ class Utils:
         self.bot_logs.append((bot, message))
 
     def print_current_estimates(self):
+        """
+        Prints the current estimated usage metrics to the console.
+
+        This method provides a quick snapshot of the estimated total number of tokens used
+        and the corresponding price estimate based on the current session or calculation.
+
+        No arguments are needed, as it references the instance attributes for the estimates.
+        """
         print('Estimated total tokens:', self.total_tokens_estimate)
         print('Estimated total price: $', self.total_price_estimate)
 
