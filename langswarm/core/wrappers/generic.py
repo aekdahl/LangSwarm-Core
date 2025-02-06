@@ -4,26 +4,35 @@ from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
 from .logging_mixin import LoggingMixin
 from .memory_mixin import MemoryMixin
-from .rag_mixin import RAGMixin
 from .util_mixin import UtilMixin
-
-# ToDo: import the langswarm.memory features for RAG
-# If not available, RAG and thereby also tools will not be available..
+from .middleware import MiddlewareMixin
 
 try:
-    from langswarm.memory.defaults.prompts import RagInstructions
+    from langswarm.cortex.defaults.prompts.system import PluginInstructions
+except ImportError:
+    PluginInstructions = None
+    
+try:
+    from langswarm.memory.defaults.prompts.system import RagInstructions
 except ImportError:
     RagInstructions = None
 
 try:
-    from langswarm.synapse.defaults.prompts import ToolInstructions
+    from langswarm.synapse.defaults.prompts.system import ToolInstructions
 except ImportError:
     ToolInstructions = None
 
-class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, RAGMixin, UtilMixin):
+
+class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, MiddlewareMixin):
     """
     A unified wrapper for LLM agents, combining memory management, logging, and LangSmith integration.
     """
+    __allow_middleware = True  # Private class-level flag
+    
+    def __init_subclass__(cls, **kwargs):
+        """Disable feature in subclasses at the class level."""
+        super().__init_subclass__(**kwargs)
+        cls.__allow_middleware = False  # Enforce restriction in all subclasses
 
     def __init__(
         self, 
@@ -32,11 +41,12 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, RAGMixin, UtilMi
         memory=None, 
         is_conversational=False, 
         langsmith_api_key=None, 
-        retrievers=None, 
-        middleware=None, 
+        rag_registry=None, 
         context_limit=None,
         system_prompt=None,
-        capability_instruction=None,
+        tool_registry=None, 
+        plugin_registry=None, 
+        plugin_instruction=None,
         tool_instruction=None,
         rag_instruction=None,
         **kwargs
@@ -50,39 +60,40 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, RAGMixin, UtilMi
             
         super().__init__(
             name=name, 
-            agent=agent, 
-            provider="wrapper", 
+            agent=agent,  
             memory=memory,
+            provider="wrapper",
             system_prompt=system_prompt,
-            capability_instruction=capability_instruction,
-            tool_instruction=tool_instruction or ToolInstructions,
-            rag_instruction=rag_instruction or RagInstructions,
+            rag_instruction=(
+                rag_instruction or RagInstructions 
+                if rag_registry is not None and rag_registry.count_rags() > 0 else None
+            ),
+            tool_instruction=(
+                tool_instruction or ToolInstructions 
+                if tool_registry is not None and tool_registry.count_tools() > 0 else None
+            ),
+            plugin_instruction=(
+                plugin_instruction or PluginInstructions 
+                if plugin_registry is not None and plugin_registry.count_plugins() > 0 else None
+            ),
             **kwargs
         )
         
-        RAGMixin.__init__(self)  # Initialize RAGMixin
         UtilMixin.__init__(self)  # Initialize UtilMixin
-
-        # Automatically add provided retrievers
-        if retrievers:
-            for retriever_name, retriever_config in retrievers.items():
-                adapter = retriever_config.get("adapter")
-                collection_name = retriever_config.get("collection_name", "default")
-                self.add_retriever(retriever_name, adapter, collection_name)
+        MiddlewareMixin.__init__(
+            self, 
+            tool_registry=tool_registry, 
+            plugin_registry=plugin_registry,
+            rag_registry=rag_registry 
+        )  # Initialize MiddlewareMixin
                 
+        self.timeout = kwargs.get("timeout", 10)
         self._initialize_logger(name, agent, langsmith_api_key)  # Use LoggingMixin's method
         self.memory = self._initialize_memory(agent, memory, self.in_memory)
         self.is_conversational = is_conversational
-        self.middleware = middleware
         self.model_details = self._get_model_details(model=kwargs.get("model", None))
         self.model_details["limit"] = context_limit or self.model_details["limit"]
-        
-        # ToDo: Move to agent creation and setup..
-        #from ..middleware.layer import MiddlewareLayer
-        #self.tools = tools or {}
-        #self.capabilities = capabilities or {}
-        #self.middleware = MiddlewareLayer(capability_registry=self.capabilities, tools=self.tools)  # Middleware initialized
-        
+
     def _call_agent(self, q, erase_query=False, remove_linebreaks=False):
 
         if q:
@@ -141,7 +152,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, RAGMixin, UtilMi
                 self.remove()
             elif q:
                 self.add_message(response, role="assistant", remove_linebreaks=remove_linebreaks)
-                self.log_event(f"Response sent back from Agent {self.name}: {response}", "info")
+                #self.log_event(f"Response sent back from Agent {self.name}: {response}", "info")
 
             return response
 
@@ -149,17 +160,15 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, RAGMixin, UtilMi
             self.log_event(f"Error for agent {self.name}: {str(e)}", "error")
             raise
         
-    def chat(self, q=None, reset=False, erase_query=False, remove_linebreaks=False, use_rag=False, retriever_names=None, **kwargs):
+    def chat(self, q=None, reset=False, erase_query=False, remove_linebreaks=False, **kwargs):
         """
-        Process a query using the wrapped agent, optionally using RAG.
+        Process a query using the wrapped agent.
 
         Parameters:
         - q (str): Query string.
         - reset (bool): Whether to reset memory before processing.
         - erase_query (bool): Whether to erase the query after processing.
         - remove_linebreaks (bool): Remove line breaks from the query.
-        :param use_rag: Whether to use RAG for the query.
-        :param retriever_names: Names of retrievers to use if use_rag is True.
 
         Returns:
         - str: The agent's response.
@@ -171,50 +180,17 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, RAGMixin, UtilMi
             if self.memory and hasattr(self.memory, clear):
                 self.memory.clear()
 
-        rag = ""
-        rag_tools = ""
-        rag_capabilities = ""
-        middleware_response = ""
         if q:
-            if use_rag:
-                
-                if self.dynamic_retrieval_decision:
-                    # Make a decision to retrieve or not.
-                    if self.dynamic_retrieval_decision.retrieve(self.share_conversation(), q):
-                
-                        # ToDo: Consider re-writing the query optimized for RAG..
-                        # rag_query = ... <-- Probably using an agent.
+            #q = "\n\nINITIAL QUERY\n\n"+q
+            response = self._call_agent(q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
 
-                        rag = self.use_rag(query=q, use_all=not retriever_names, retriever_names=retriever_names)
-                        if rag != "":
-                            rag = "\n\nRETRIEVED INFORMATION\n\n"+rag
-            
-            if self.middleware:
-                # - Retrieve usable tools
-                # - Create a new retriever only for this
-                if self.indexing_is_available:
-                    results = self.query_index(q)
-                    rag_tools = "\n".join([res["text"] for res in results]) if results else ""
-                    if rag_tools != "":
-                        rag = "\n\nAVAILABLE TOOLS\n\n"+rag_tools+rag
-
-                # - Retrieve usable capabilities (later)
-                # - Create a new retriever only for this
-                if self.indexing_is_available:
-                    results = self.query_index(q)
-                    rag_capabilities = "\n".join([res["text"] for res in results]) if results else ""
-                    if rag_capabilities != "":
-                        rag = "\n\nAVAILABLE CAPABILITIES\n\n"+rag_capabilities+rag
-
-            q = "\n\nINITIAL QUERY\n\n"+q
-            response = self._call_agent(rag+q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
-
-            if self.middleware:
+            if self.__allow_middleware:
                 # MIDDLEWARE IMPLEMENTATION
-                middleware_result, middleware_response = self.middleware.process_input(response)
-                if middleware_result == 201:  # Middleware used tool or capability successfully
-                    middleware_response = "\n\nTOOL OR CAPABILITY OUTPUT\n\n"+middleware_response
-                    response = self._call_agent(middleware_response+rag+q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
+                middleware_status, middleware_response = self.to_middleware(response)
+                if middleware_status == 201:  # Middleware used tool successfully
+                    #middleware_response = "\n\nTOOL OR CAPABILITY OUTPUT\n\n"+middleware_response
+                    response = self._call_agent(
+                        middleware_response, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
 
         return response
 

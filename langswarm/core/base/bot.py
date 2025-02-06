@@ -29,7 +29,7 @@ class LLM:
         memory=None,
         specialization=None,
         agent=None,
-        capability_instruction=None,
+        plugin_instruction=None,
         tool_instruction=None,
         rag_instruction=None,
         **kwargs
@@ -89,11 +89,11 @@ class LLM:
         self.last_in_memory = ''
         self.verbose = verbose
         
-        self.system_prompt = (
-            f"{system_prompt or HelloWorld}\n\n"
-            f"{rag_instruction or ''}\n\n"
-            f"{tool_instruction or ''}\n\n"
-            f"{capability_instruction or ''}"
+        self.system_prompt = self._build_system_prompt(
+            system_prompt=system_prompt or HelloWorld,
+            rag_instruction=rag_instruction,
+            tool_instruction=tool_instruction,
+            plugin_instruction=plugin_instruction
         )
         
         self.specialization = specialization
@@ -101,6 +101,48 @@ class LLM:
         self.update_system_prompt()
         self.utils.bot_log(self.name, {"role": "admin", "content": "Bot was created."})
     
+    def _build_system_prompt(
+        self,
+        system_prompt=None,
+        hello_world="You are a helpful professional assistant.",
+        rag_instruction=None,
+        tool_instruction=None,
+        plugin_instruction=None
+    ):
+        """
+        Constructs a system prompt by combining the main system prompt (or hello_world)
+        with optional instructions for RAG, tools, and plugins. If any instruction is added,
+        a final note is appended indicating multiple requests can be combined.
+        """
+        # Start with either system_prompt or the default hello_world.
+        main_part = system_prompt or hello_world
+
+        # Gather all instructions that are not None or empty.
+        instructions = []
+        if rag_instruction:
+            instructions.append(rag_instruction)
+        if tool_instruction:
+            instructions.append(tool_instruction)
+        if plugin_instruction:
+            instructions.append(plugin_instruction)
+
+        # If we actually added instructions, add the final note.
+        if len(instructions) > 1:
+            instructions.append(
+                "You may make multiple requests in the same response, "
+                "using any valid request types (rags, tools, plugins) if necessary. "
+                "It is often a good idea to check for both tools and plugins when checking."
+            )
+
+        # Build the final prompt with minimal line breaks.
+        # The main_part is mandatory, instructions are optional.
+        parts = [main_part] + instructions
+
+        # Join only non-empty parts with two newlines between sections.
+        system_prompt_combined = "\n\n".join(part for part in parts if part)
+
+        return system_prompt_combined
+
     def update_system_prompt(self, system_prompt=None):
         """
         Update the system prompt for the conversation.
