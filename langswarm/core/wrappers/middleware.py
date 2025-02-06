@@ -40,7 +40,7 @@ class MiddlewareMixin:
         self.rag_registry = rag_registry or RAGRegistry()
         self.tool_registry = tool_registry or ToolRegistry()
         self.plugin_registry = plugin_registry or PluginRegistry()
-        self.rag_command_regex = r"use rag:([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{[^}]*\})"
+        self.rag_command_regex = r"use (?:rag|retriever):([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{[^}]*\})"
         self.tool_command_regex = r"use tool:([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{[^}]*\})"
         self.plugin_command_regex = r"use plugin:([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{[^}]*\})"
         self.request_rags_regex = r"request:rags\|(.*)"
@@ -121,6 +121,8 @@ class MiddlewareMixin:
         try:
             # Extract multiple rag usages
             for match in rag_matches:
+                if match.group(1) == 'name' or match.group(2) == 'action':
+                    continue
                 rag_name = match.group(1)
                 action = match.group(2)
                 json_part = re.sub(r'(?<!\\)\n', '\\n', match.group(3))  # Escape newlines
@@ -129,6 +131,8 @@ class MiddlewareMixin:
 
             # Extract multiple tool usages
             for match in tool_matches:
+                if match.group(1) == 'name' or match.group(2) == 'action':
+                    continue
                 tool_name = match.group(1)
                 action = match.group(2)
                 json_part = re.sub(r'(?<!\\)\n', '\\n', match.group(3))  # Escape newlines
@@ -137,6 +141,8 @@ class MiddlewareMixin:
 
             # Extract multiple plugin usages
             for match in plugin_matches:
+                if match.group(1) == 'name' or match.group(2) == 'action':
+                    continue
                 plugin_name = match.group(1)
                 action = match.group(2)
                 json_part = re.sub(r'(?<!\\)\n', '\\n', match.group(3))  # Escape newlines

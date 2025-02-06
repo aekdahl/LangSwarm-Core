@@ -1,4 +1,4 @@
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Dict, Callable, List
 
 from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
@@ -87,7 +87,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             rag_registry=rag_registry 
         )  # Initialize MiddlewareMixin
                 
-        self.timeout = kwargs.get("timeout", 10)
+        self.timeout = kwargs.get("timeout", 60) # 60 second timeout.
         self._initialize_logger(name, agent, langsmith_api_key)  # Use LoggingMixin's method
         self.memory = self._initialize_memory(agent, memory, self.in_memory)
         self.is_conversational = is_conversational
@@ -193,6 +193,20 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
                         middleware_response, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
 
         return response
+    
+    def _format_final_response(self, query: List[str]) -> str:
+        """
+        Parse the response from multi-steps.
+
+        Parameters:
+        - query: The agent's raw response.
+
+        Returns:
+        - str: The final response.
+        """
+        joined = "\n\n".join(query)
+        final_query = f"Please summarize and format the following response history into one coherent response back to the user. \n\n-- RESPONSE HISTORY --\n\n{joined}"
+        return self._call_agent(final_query)
 
     def _parse_response(self, response: Any) -> str:
         """
