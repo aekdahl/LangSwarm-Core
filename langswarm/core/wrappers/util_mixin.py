@@ -1,8 +1,12 @@
+import re
 from ..utils.utilities import Utils
 
 class UtilMixin:
     def __init__(self):
         self.utils = Utils()
+        
+        # Precompiled regex patterns for efficiency
+        self.INVALID_REQUEST_PATTERN = re.compile(r"request:([^\s|]+)\|.+\|")
         
     @property
     def MODEL_REGISTRY(self):
@@ -92,3 +96,135 @@ class UtilMixin:
     
     def _get_model_details(self, model, default=16000):
         return {"name": model, **self.MODEL_REGISTRY.get(str(model), {"limit": default, "ppm": 0})}
+
+    def _is_valid_request_calls_in_text(self, text: str) -> bool:
+        """
+        Determines if all 'request:' calls in `text` are valid given the rules:
+
+        1) If there's no 'request:' substring at all, it's valid (no calls).
+        2) If we see `request:someword`, and 'someword' is not in (tools|rags|retrievers|plugins),
+           then it's valid only if there are 0 pipes in that snippet.
+        3) If we see `request:(tools|rags|retrievers|plugins)`, 
+           it must have exactly one pipe in that snippet, 
+           and the substring after that pipe can contain spaces or any text. 
+           If 0 or 2+ pipes => invalid.
+
+        Returns True if all calls are valid or if none exist, otherwise False.
+        """
+
+        # 1) Find each snippet that starts with 'request:' 
+        pattern = re.compile(r"(request:[^\n]+?)(?=\s*request:|\Z)", re.IGNORECASE | re.DOTALL)
+        snippets = pattern.findall(text)
+        if not snippets:
+            # No 'request:' => valid
+            return True
+
+        # 2) Validate each snippet
+        for snippet in snippets:
+            if not self._validate_single_request_snippet(snippet.strip()):
+                return False
+
+        return True
+
+    def _validate_single_request_snippet(self, snippet: str) -> bool:
+        """
+        Validates a single substring that starts with 'request:' based on the rules:
+
+        - If snippet doesn't match "request:something", we consider it not a real request => valid.
+        - Otherwise parse the word after 'request:'.
+          * If that word is not in (tools|rags|retrievers|plugins) => must have 0 pipes => valid, else invalid.
+          * If that word is in (tools|rags|retrievers|plugins) => must have exactly 1 pipe => valid, else invalid.
+        """
+
+        # Quick prefix check
+        if not snippet.lower().startswith("request:"):
+            return True  # Not a 'request:' snippet => valid
+
+        # Extract the word after 'request:' (up to space/pipe)
+        match_prefix = re.match(r"^request:([^\s|]+)", snippet, re.IGNORECASE)
+        if not match_prefix:
+            # e.g. "request: " with a space => handle if there's a pipe => invalid, else => valid
+            return not ("|" in snippet)
+
+        found_word = match_prefix.group(1)  # e.g. 'tools', 'myword', etc.
+        valid_keywords = {"tools", "rags", "retrievers", "plugins"}
+
+        # Count total pipes in snippet
+        pipe_count = snippet.count("|")
+
+        if found_word.lower() not in valid_keywords:
+            # Then must have 0 pipes
+            return (pipe_count == 0)
+        else:
+            # found_word is in (tools|rags|retrievers|plugins)
+            # must have exactly 1 pipe
+            return (pipe_count == 1)
+
+
+    def _is_valid_use_calls_in_text(self, text: str) -> bool:
+        """
+        Checks whether any 'use (tool|rag|retriever|plugin):...' calls in `text`
+        are correctly formatted. If a snippet has "use tool:" (or rag/retriever/plugin)
+        with fewer than 2 pipes, we decide:
+            - 0 pipes => non-call => valid
+            - 1 pipe => partial call => invalid
+            - 2+ pipes => must strictly match a valid pattern
+
+        Returns True if all calls are valid (or no calls exist), otherwise False.
+        """
+
+        # Regex to find each snippet starting with 'use tool|rag|retriever|plugin:'
+        pattern = re.compile(
+            r"(use\s+(?:tool|rag|retriever|plugin):[^\n]+?)(?=\s*use\s+(?:tool|rag|retriever|plugin)|$)",
+            re.IGNORECASE | re.DOTALL
+        )
+
+        # Extract all occurrences
+        matches = pattern.findall(text)
+        if not matches:
+            # No 'use' calls => valid
+            return True
+
+        for snippet in matches:
+            if not self._validate_single_use_call(snippet.strip()):
+                return False
+
+        return True
+
+    def _validate_single_use_call(self, use_call: str) -> bool:
+        """
+        Validates one snippet that starts with "use (tool|rag|retriever|plugin):".
+
+        - 0 pipes => treat as non-call => valid
+        - 1 pipe => partial call => invalid
+        - 2+ pipes => must match the final pattern:
+             use (tool|rag|retriever|plugin):<one_word>|<one_word>|<anything>
+
+        Returns True if valid or no actual call, otherwise False.
+        """
+
+        prefix_pattern = re.compile(r"^use\s+(tool|rag|retriever|plugin):", re.IGNORECASE)
+        prefix_match = prefix_pattern.match(use_call)
+        if not prefix_match:
+            # Not even starting with 'use tool|rag...', so treat as valid
+            return True
+
+        # Count how many '|' are present
+        pipe_count = use_call.count('|')
+
+        if pipe_count == 0:
+            # "use tool: My favorite one" => no calls => valid
+            return True
+        elif pipe_count == 1:
+            # "use tool:my_favorite_one|" => partial call => invalid
+            return False
+        else:
+            # 2 or more pipes => parse strictly with a final pattern
+            valid_pattern = re.compile(
+                r"^use\s+(?:tool|rag|retriever|plugin):" 
+                r"([A-Za-z0-9_\-]+)\|" 
+                r"([A-Za-z0-9_\-]+)\|"  # second word
+                r"(.*)$",
+                re.IGNORECASE
+            )
+            return bool(valid_pattern.match(use_call))

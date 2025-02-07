@@ -47,6 +47,8 @@ class MiddlewareMixin:
         self.request_tools_regex = r"request:tools\|(.*)"
         self.request_plugin_regex = r"request:plugins\|(.*)"
         self.ask_to_continue_regex = r"\[AGENT_REQUEST:PROCEED_WITH_INTERNAL_STEP\]"
+        self.check_for_continuation = r"(?<=\b)(?:I(?:'m| am| will| am now| will now| will go ahead)\s+(?:go(?:ing)? to|proceed(?:ing)? to|execute|start|begin|attempt|perform|carry out)|Executing\s+the\b)[^.!?]*[.!?](?!(?:\s+\S|$))"
+        # ToDo: Add these cases to regex: "Let’s proceed with that now."
 
     def to_middleware(self, agent_input):
         """
