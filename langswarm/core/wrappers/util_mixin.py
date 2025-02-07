@@ -1,4 +1,5 @@
 import re
+import json
 from ..utils.utilities import Utils
 
 class UtilMixin:
@@ -228,3 +229,59 @@ class UtilMixin:
                 re.IGNORECASE
             )
             return bool(valid_pattern.match(use_call))
+
+    def _sanitize_json_string(self, json_string: str) -> str:
+        """
+        Cleans and corrects common issues in a JSON string before parsing with json.loads().
+
+        :param json_string: The raw JSON string that may contain errors.
+        :return: A corrected JSON string ready for parsing.
+        """
+
+        # Step 1: Remove invalid trailing commas before closing brackets or braces
+        json_string = re.sub(r",\s*([\]}])", r"\1", json_string)
+
+        # Step 2: Ensure that double quotes inside strings are properly escaped
+        json_string = re.sub(r'(?<!\\)"(.*?)"(?![:,\]\}])', lambda m: f'\"{m.group(1)}\"', json_string)
+
+        # Step 3: Detect and fix common unterminated string issues
+        if json_string.count('"') % 2 != 0:
+            json_string = json_string.rstrip('"') + '"'
+
+        # Step 4: Ensure that brackets and braces are balanced
+        open_braces = json_string.count('{')
+        close_braces = json_string.count('}')
+        open_brackets = json_string.count('[')
+        close_brackets = json_string.count(']')
+
+        if open_braces > close_braces:
+            json_string += "}" * (open_braces - close_braces)
+        elif close_braces > open_braces:
+            json_string = json_string.rstrip('}')  # Extra closing brace issue
+
+        if open_brackets > close_brackets:
+            json_string += "]" * (open_brackets - close_brackets)
+        elif close_brackets > open_brackets:
+            json_string = json_string.rstrip(']')
+
+        return json_string
+
+    # ToDo: Should probably be in the original utilities.py file.
+    def safe_json_loads(self, json_string: str):
+        """
+        Safely loads a JSON string after attempting corrections.
+
+        :param json_string: The raw JSON string to parse.
+        :return: The parsed JSON object or None if it cannot be corrected.
+        """
+        try:
+            return json.loads(json_string)
+        except json.JSONDecodeError as e:
+            print(f"Initial JSON parsing failed: {e}. Attempting to sanitize...")
+            corrected_json = self._sanitize_json_string(json_string)
+
+            try:
+                return json.loads(corrected_json)
+            except json.JSONDecodeError as final_error:
+                print(f"JSON parsing still failed after sanitization: {final_error}")
+                return None

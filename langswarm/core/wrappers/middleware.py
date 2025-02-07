@@ -128,7 +128,7 @@ class MiddlewareMixin:
                 rag_name = match.group(1)
                 action = match.group(2)
                 json_part = re.sub(r'(?<!\\)\n', '\\n', match.group(3))  # Escape newlines
-                arguments = json.loads(json_part)
+                arguments = self.safe_json_loads(json_part)
                 actions.append(("rag", rag_name, action, arguments))
 
             # Extract multiple tool usages
@@ -138,7 +138,7 @@ class MiddlewareMixin:
                 tool_name = match.group(1)
                 action = match.group(2)
                 json_part = re.sub(r'(?<!\\)\n', '\\n', match.group(3))  # Escape newlines
-                arguments = json.loads(json_part)
+                arguments = self.safe_json_loads(json_part)
                 actions.append(("tool", tool_name, action, arguments))
 
             # Extract multiple plugin usages
@@ -148,7 +148,7 @@ class MiddlewareMixin:
                 plugin_name = match.group(1)
                 action = match.group(2)
                 json_part = re.sub(r'(?<!\\)\n', '\\n', match.group(3))  # Escape newlines
-                arguments = json.loads(json_part)
+                arguments = self.safe_json_loads(json_part)
                 actions.append(("plugin", plugin_name, action, arguments))
 
             # Extract multiple rag requests
