@@ -110,8 +110,9 @@ class MiddlewareMixin:
         :param reasoning: str - The reasoning output containing potential actions.
         :return: List[Tuple[str, str, str, dict]] - List of (action_type, action_name, action, params).
         """
-
         actions = []
+        
+        reasoning = self._parse_for_actions(reasoning)
 
         rag_matches = re.finditer(self.rag_command_regex, reasoning, re.IGNORECASE)
         tool_matches = re.finditer(self.tool_command_regex, reasoning, re.IGNORECASE)
@@ -263,4 +264,4 @@ class MiddlewareMixin:
         :param level: str - Log level.
         :param metadata: dict - Additional log metadata.
         """
-        self.log_event(f"ReAct agent {self.name}: {message}", level)   
+        self.log_event(f"ReAct agent {self.name}: {message}", level)  

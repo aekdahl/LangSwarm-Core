@@ -265,7 +265,46 @@ class UtilMixin:
             json_string = json_string.rstrip(']')
 
         return json_string
+    
+    def escape_unescaped_quotes_in_json_values(self, json_string: str) -> str:
+        """
+        Scans for all "key":"value" pairs in a JSON-like string and escapes 
+        any unescaped double quotes inside the string value. Helps prevent JSONDecodeError 
+        by turning unescaped `"` into `\"` in each value.
 
+        Returns the corrected JSON string.
+        """
+
+        # This regex attempts to capture:
+        #   1) A JSON key:  ("someKey")
+        #   2) A colon + optional space:  :\s*
+        #   3) The start of a double-quoted value:  "
+        #   4) The raw content inside that value:  (.*?)  (non-greedy)
+        #   5) The closing quote:  "
+        #
+        # We'll use a capture group for the partial string so we can do re.sub on it.
+        # We'll NOT handle escaped quotes in the key itself, only the value part.
+        pattern = re.compile(
+            r'("[^"]*"\s*:\s*")([^"]*)(?=")',
+            flags=re.DOTALL
+        )
+
+        def escape_inner_quotes(match):
+            # match.group(1) = the entire prefix up to the start of the value's content
+            # match.group(2) = the content inside the double quotes (not including them)
+            prefix = match.group(1)
+            value_content = match.group(2)
+
+            # Escape any unescaped quotes inside value_content:
+            # search for quotes that aren't preceded by a backslash
+            escaped_value = re.sub(r'(?<!\\)"', r'\"', value_content)
+
+            # Rebuild
+            return f'{prefix}{escaped_value}'
+
+        corrected = pattern.sub(escape_inner_quotes, json_string)
+        return corrected
+        
     # ToDo: Should probably be in the original utilities.py file.
     def safe_json_loads(self, json_string: str):
         """
@@ -284,4 +323,87 @@ class UtilMixin:
                 return json.loads(corrected_json)
             except json.JSONDecodeError as final_error:
                 print(f"JSON parsing still failed after sanitization: {final_error}")
-                return None
+                fixed = self.escape_unescaped_quotes_in_json_values(json_string)
+                corrected_json = self._sanitize_json_string(fixed)
+                try:
+                    return json.loads(corrected_json)
+                except json.JSONDecodeError as e:
+                    print("Still failed after escaping quotes:", e)
+                    return None
+
+    def remove_triple_double_quoted_strings(self, code: str) -> str:
+        """
+        Removes only triple-double-quoted strings (\"\"\"...\"\"\") from the code
+        and leaves everything else (including triple-single-quoted '''...''') intact.
+        Returns the code with those \"\"\" docstrings stripped.
+        """
+        # Pattern for only \"\"\" blocks, non-greedy, dotall (across lines)
+        pattern = re.compile(r'"""[\s\S]*?"""', re.DOTALL)
+
+        return pattern.sub("", code)
+    
+    def remove_all_triple_quoted_strings(self, code: str) -> str:
+        """
+        Removes triple-double-quoted (\"\"\"...\"\"\") and triple-single-quoted ('''...''') 
+        docstrings from the code.
+
+        Returns the code with those docstrings stripped.
+        """
+        triple_quotes_pattern = re.compile(
+            r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')', 
+            re.DOTALL
+        )
+        return triple_quotes_pattern.sub("", code)
+    
+    def remove_code_blocks_and_doc_examples(self, text: str) -> str:
+        """
+        Removes code fences (triple backticks) and docstring-like examples from the text
+        so that lines inside them are not parsed as real actions.
+
+        Returns the text stripped of these example blocks.
+        """
+
+        # 1) Remove triple-backtick code fences:
+        #    Matches ``` (optional info) up to the next ```.
+        code_fence_pattern = re.compile(r"```.*?```", re.DOTALL)
+        text_no_fence = code_fence_pattern.sub("", text)
+
+        # 2) Remove or mask lines labeled as "Example usage:" or "Examples:" 
+        #    up until next blank line or next heading
+        #    (Heuristic approach)
+        example_usage_pattern = re.compile(
+            r"(Example usage:|Examples?:).*?(?=\n\s*\n|^##|\Z)",
+            re.DOTALL | re.IGNORECASE | re.MULTILINE
+        )
+        cleaned_text = example_usage_pattern.sub("", text_no_fence)
+
+        return cleaned_text
+    
+    def _remove_placeholder_requests(self, text: str) -> str:
+        """
+        Removes calls like `request:tools|<your_query>` from the text so they
+        won't be treated as real actions.
+
+        Returns the text with those placeholder requests removed.
+        """
+        # Regex pattern:
+        # - request:
+        # - (tools|rags|retrievers|plugins)
+        # - A pipe `|`
+        # - A `<...>` block with no extra pipe or quotes 
+        #    For example: <my_stuff> or <any text> but not other calls
+        pattern = re.compile(r"request:(?:tools|rags|retrievers|plugins)\|\s*<[^>]*>", re.IGNORECASE)
+
+        # Remove each match from the text
+        return pattern.sub("", text)
+
+
+    def _parse_for_actions(self, text: str) -> str:
+        """
+        Removes code blocks & doc examples, then searches for `action_pattern`.
+        Returns True if found, otherwise False.
+        """
+        sanitized = self.remove_all_triple_quoted_strings(text)
+        sanitized = self.remove_code_blocks_and_doc_examples(sanitized)
+        sanitized = self._remove_placeholder_requests(sanitized)
+        return sanitized
