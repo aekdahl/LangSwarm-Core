@@ -6,9 +6,6 @@ class UtilMixin:
     def __init__(self):
         self.utils = Utils()
         
-        # Precompiled regex patterns for efficiency
-        self.INVALID_REQUEST_PATTERN = re.compile(r"request:([^\s|]+)\|.+\|")
-        
     @property
     def MODEL_REGISTRY(self):
         return {

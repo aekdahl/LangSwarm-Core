@@ -57,7 +57,8 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             
         if memory and hasattr(memory, "output_key"):
             memory.output_key = memory.output_key or "output"
-            
+
+        
         super().__init__(
             name=name, 
             agent=agent,  
@@ -65,16 +66,37 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             provider="wrapper",
             system_prompt=system_prompt,
             rag_instruction=(
-                rag_instruction or RagInstructions 
-                if rag_registry is not None and rag_registry.count_rags() > 0 else None
+                (
+                    f"{rag_instruction or RagInstructions} \n\n"
+                    f"-- AVAILABLE RAGS AND RETRIEVERS -- \n"
+                    f"{'\n\n'.join(rag_registry.list_rags())}"
+                )
+                if (rag_instruction or RagInstructions) 
+                and rag_registry is not None 
+                and rag_registry.count_rags() > 0
+                else None
             ),
-            tool_instruction=(
-                tool_instruction or ToolInstructions 
-                if tool_registry is not None and tool_registry.count_tools() > 0 else None
+            tool_instruction = (
+                (
+                    f"{tool_instruction or ToolInstructions} \n\n"
+                    f"-- AVAILABLE TOOLS -- \n"
+                    f"{'\n\n'.join(tool_registry.list_tools())}"
+                )
+                if (tool_instruction or ToolInstructions) 
+                and tool_registry is not None 
+                and tool_registry.count_tools() > 0
+                else None
             ),
             plugin_instruction=(
-                plugin_instruction or PluginInstructions 
-                if plugin_registry is not None and plugin_registry.count_plugins() > 0 else None
+                (
+                    f"{plugin_instruction or PluginInstructions} \n\n"
+                    f"-- AVAILABLE PLUGINS -- \n"
+                    f"{'\n\n'.join(plugin_registry.list_plugins())}"
+                )
+                if (plugin_instruction or PluginInstructions) 
+                and plugin_registry is not None 
+                and plugin_registry.count_plugins() > 0
+                else None
             ),
             **kwargs
         )

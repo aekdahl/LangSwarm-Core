@@ -97,7 +97,7 @@ class Utils:
             if GPT2Tokenizer:
                 num_tokens = len(self.gpt2_tokenizer.encode(string))
             else:
-                print("No toen counter found, install tiktoken or GPT2Tokenizer to get correct token count.")
+                print("No token counter found, install tiktoken or GPT2Tokenizer to get correct token count.")
                 num_tokens = len(string)
 
         # Calculate price
@@ -143,7 +143,7 @@ class Utils:
         # Check if any space is left?
         max_remaining_tokens = max_tokens - current_tokens
         
-        if max_remaining_tokens < 0:
+        if max_remaining_tokens <= 0:
             return text
 
         # Truncate tokens to the allowed limit
