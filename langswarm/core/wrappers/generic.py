@@ -1,4 +1,8 @@
-from typing import Any, Optional, Dict, Callable, List
+import json
+from datetime import datetime
+from typing import Type, Any, Optional, Dict, Callable, List
+
+from langswarm.memory.adapters.database_adapter import DatabaseAdapter
 
 from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
@@ -6,6 +10,40 @@ from .logging_mixin import LoggingMixin
 from .memory_mixin import MemoryMixin
 from .util_mixin import UtilMixin
 from .middleware import MiddlewareMixin
+from ..registry.agents import AgentRegistry
+
+try:
+    from llama_index.llms import OpenAI as LlamaOpenAI, Anthropic as LlamaAnthropic, Cohere as LlamaCohere, AI21 as LlamaAI21
+except ImportError:
+    LlamaOpenAI = None
+    LlamaAnthropic = None
+    LlamaCohere = None
+    LlamaAI21 = None
+    
+try:
+    from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
+except ImportError:
+    ChatOpenAI = None
+    AzureChatOpenAI = None
+    
+try:
+    from langchain.llms import OpenAI as LangChainOpenAI, Anthropic, Cohere, AI21, VertexAI
+except ImportError:
+    LangChainOpenAI = None
+    Anthropic = None
+    Cohere = None
+    AI21 = None
+    VertexAI = None
+    
+try:
+    from langchain.llms.huggingface_hub import HuggingFaceHub
+except ImportError:
+    HuggingFaceHub = None
+    
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 try:
     from langswarm.cortex.defaults.prompts.system import PluginInstructions
@@ -37,8 +75,10 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
     def __init__(
         self, 
         name, 
-        agent, 
+        agent,
+        model,
         memory=None, 
+        agent_type=None,
         is_conversational=False, 
         langsmith_api_key=None, 
         rag_registry=None, 
@@ -49,6 +89,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         plugin_instruction=None,
         tool_instruction=None,
         rag_instruction=None,
+        memory_adapter: Optional[Type[DatabaseAdapter]] = None,
         **kwargs
     ):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
@@ -57,19 +98,24 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             
         if memory and hasattr(memory, "output_key"):
             memory.output_key = memory.output_key or "output"
+            
+        if memory_adapter is not None and not isinstance(memory_adapter, DatabaseAdapter):
+            raise TypeError(
+                f"Argument 'adapter' must be a subclass of DatabaseAdapter if provided, got {type(memory_adapter).__name__}")
 
-        
         super().__init__(
             name=name, 
-            agent=agent,  
+            agent=agent, 
+            model=model,  
             memory=memory,
             provider="wrapper",
+            agent_type=agent_type,
             system_prompt=system_prompt,
             rag_instruction=(
                 (
-                    f"{rag_instruction or RagInstructions} \n\n"
-                    f"-- AVAILABLE RAGS AND RETRIEVERS -- \n"
-                    f"{'\n\n'.join(rag_registry.list_rags())}"
+                    f"{rag_instruction or RagInstructions}" + "\n\n"
+                    "-- AVAILABLE RAGS AND RETRIEVERS --\n"
+                    + "\n\n".join(rag_registry.list_rags())
                 )
                 if (rag_instruction or RagInstructions) 
                 and rag_registry is not None 
@@ -78,9 +124,9 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             ),
             tool_instruction = (
                 (
-                    f"{tool_instruction or ToolInstructions} \n\n"
+                    f"{tool_instruction or ToolInstructions}" + "\n\n"
                     f"-- AVAILABLE TOOLS -- \n"
-                    f"{'\n\n'.join(tool_registry.list_tools())}"
+                    + "\n\n".join(tool_registry.list_tools())
                 )
                 if (tool_instruction or ToolInstructions) 
                 and tool_registry is not None 
@@ -89,9 +135,9 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             ),
             plugin_instruction=(
                 (
-                    f"{plugin_instruction or PluginInstructions} \n\n"
+                    f"{plugin_instruction or PluginInstructions}" + "\n\n"
                     f"-- AVAILABLE PLUGINS -- \n"
-                    f"{'\n\n'.join(plugin_registry.list_plugins())}"
+                    + "\n\n".join(plugin_registry.list_plugins())
                 )
                 if (plugin_instruction or PluginInstructions) 
                 and plugin_registry is not None 
@@ -113,8 +159,78 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         self._initialize_logger(name, agent, langsmith_api_key)  # Use LoggingMixin's method
         self.memory = self._initialize_memory(agent, memory, self.in_memory)
         self.is_conversational = is_conversational
-        self.model_details = self._get_model_details(model=kwargs.get("model", None))
+        self.model_details = self._get_model_details(model=model)
         self.model_details["limit"] = context_limit or self.model_details["limit"]
+        self.model_details["ppm"] = kwargs.get("ppm", None) or self.model_details["ppm"]
+        self.memory_adapter = memory_adapter
+        
+    def _report_estimated_usage(self, context, price_key="ppm", enforce=False, verbose=False):
+        if enforce or self._cost_api_detected():
+            num_tokens, price = self.utils.price_tokens_from_string(
+                f"{context}", 
+                encoding_name=self.model, 
+                price_per_million=self.model_details[price_key], 
+                verbose=verbose
+            )
+
+            AgentRegistry.report_usage(self.name, price)
+        
+    def _cost_api_detected(self):
+    
+        # --- Native API Models ---
+        valid_classes = tuple(filter(None, (OpenAI, )))
+        if valid_classes and isinstance(self.agent, valid_classes):
+            return True
+        
+        # --- LangChain API Models ---
+        valid_classes = tuple(filter(None, (ChatOpenAI, LangChainOpenAI, Anthropic, Cohere, AI21, VertexAI, AzureChatOpenAI)))
+        if valid_classes and isinstance(self.agent, valid_classes):
+            return True
+        
+        # --- LlamaIndex API Models ---
+        valid_classes = tuple(filter(None, (LlamaOpenAI, LlamaAnthropic, LlamaCohere, LlamaAI21)))
+        if valid_classes and isinstance(self.agent, valid_classes):
+            return True 
+        
+        # --- Hugging Face API (Hugging Face Hub) ---
+        valid_classes = tuple(filter(None, (HuggingFaceHub, )))
+        if valid_classes and isinstance(self.agent, valid_classes):
+            return True 
+        
+        return False
+    
+    def _store_conversation(self, user_input, agent_response, session_id="default_session"):
+        """Store conversation turn in the vector DB while preserving document structure."""
+        if self.memory_adapter is None:
+            return
+        
+        timestamp = datetime.utcnow().isoformat()
+        key = self.utils.generate_short_uuid()
+
+        # Create structured document
+        document = {
+            "key": key,
+            "session_id": session_id,
+            "timestamp": timestamp,
+            "user_input": user_input,
+            "agent_response": agent_response,
+            "metadata": {
+                "conversation_id": session_id,
+                "timestamp": timestamp,
+                "key": key,
+                #"tags": ["chat_history", "memory"] <-- ToDo: How do we create the tags?
+            }
+        }
+
+        # Convert to JSON string
+        json_document = json.dumps(document)
+
+        # Store structured data in vector DB
+        self.memory_adapter.add_documents([{
+            "key": key,
+            "text": json_document,
+            "metadata": document.get("metadata", {})
+        }])
 
     def _call_agent(self, q, erase_query=False, remove_linebreaks=False):
 
@@ -128,28 +244,35 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
                 # LangChain agents
                 if hasattr(self.agent, "memory") and self.agent.memory:
                     # Memory is already managed by the agent
+                    self._report_estimated_usage(q)
                     response = self.agent.run(q)
                 else:
                     # No memory, include context manually
                     if callable(self.agent):
                         # Direct calls are deprecated, so we use .invoke() instead.
                         if self.in_memory:
+                            self._report_estimated_usage(self.in_memory)
                             response = self.agent.invoke(self.in_memory)
                         else:
+                            self._report_estimated_usage(q)
                             response = self.agent.invoke(q)
                     else:
                         context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else q
+                        self._report_estimated_usage(context)
                         response = self.agent.run(context)
             elif self._is_llamaindex_agent(self.agent):
                 # LlamaIndex agents
                 context = " ".join([message["content"] for message in self.in_memory])
+                self._report_estimated_usage(context)
                 response = self.agent.query(context if self.memory else q).response
             elif self._is_hugging_face_agent(self.agent) and callable(self.agent):
                 # Hugging Face agents
                 context = " ".join([message["content"] for message in self.in_memory]) if self.is_conversational else q
+                self._report_estimated_usage(context)
                 response = self.agent(context)
             elif self._is_openai_llm(self.agent) or hasattr(self.agent, "ChatCompletion"):
                 try:
+                    self._report_estimated_usage(self.in_memory)
                     completion = self.agent.ChatCompletion.create(
                         model=self.model,
                         messages=self.in_memory,
@@ -157,6 +280,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
                     )
                     response = completion['choices'][0]['message']['content']
                 except:
+                    self._report_estimated_usage(self.in_memory)
                     completion = self.agent.chat.completions.create(
                         model=self.model,
                         messages=self.in_memory,
@@ -169,6 +293,12 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             # Parse and log response
             response = self._parse_response(response)
             self.log_event(f"Agent {self.name} response: {response}", "info")
+            
+            # Setup cost reporting with outgoing token cost as well.
+            self._report_estimated_usage(response, price_key="ppm_out")
+            
+            session_id = "default_session" # ToDo: Create a session id
+            self._store_conversation(f"{q}", response, session_id)
 
             if q and erase_query:
                 self.remove()
@@ -216,6 +346,15 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
 
         return response
     
+    def reflect_and_improve(response):
+        prompt = f"""Evaluate the following response for clarity, correctness, and relevance.
+        If it can be improved, return a revised version. Otherwise, return it unchanged.
+
+        Response: {response}
+        """
+        refined_response = agent.chat(prompt)
+        return refined_response
+
     def _format_final_response(self, query: List[str]) -> str:
         """
         Parse the response from multi-steps.

@@ -1,7 +1,7 @@
 from typing import Any, Optional
 from ..wrappers.generic import AgentWrapper
 from ..utils.utilities import Utils
-
+from ..registry.agents import AgentRegistry
 
 try:
     from langswarm.cortex.react.agent import ReActAgent
@@ -26,6 +26,7 @@ class AgentFactory:
         documents: Optional[list] = None,
         memory: Optional[Any] = None,
         langsmith_api_key: Optional[str] = None,
+        register_as="agent",
         **kwargs,
     ) -> AgentWrapper:
         """
@@ -45,25 +46,32 @@ class AgentFactory:
         agent = AgentFactory._create_base_agent(agent_type, documents, **kwargs)
 
         # Wrap the agent using AgentWrapper
-        return AgentWrapper(
+        wrapped_agent = AgentWrapper(
             name=name,
             agent=agent,
             memory=memory,
+            agent_type=agent_type,
             langsmith_api_key=langsmith_api_key,
             **kwargs,
         )
+        
+        # Register the agent
+        AgentFactory._register_agent(wrapped_agent, register_as=register_as)
+        
+        return wrapped_agent
     
     @staticmethod
-    def create_react(
+    def create_tool_agent(
         name: str,
         agent_type: str,
         documents: Optional[list] = None,
         memory: Optional[Any] = None,
         langsmith_api_key: Optional[str] = None,
+        register_as="agent",
         **kwargs,
-    ) -> ReActAgent:
+    ) -> AgentWrapper:
         """
-        Create an agent with the given parameters.
+        Create a tool agent with the given parameters.
 
         Parameters:
         - name (str): The name of the agent.
@@ -78,14 +86,111 @@ class AgentFactory:
         """
         agent = AgentFactory._create_base_agent(agent_type, documents, **kwargs)
 
-        # Wrap the agent using ReActAgent
-        return ReActAgent(
+        # Wrap the agent using AgentWrapper
+        wrapped_agent = AgentWrapper(
             name=name,
             agent=agent,
             memory=memory,
+            agent_type=agent_type,
             langsmith_api_key=langsmith_api_key,
             **kwargs,
         )
+        
+        # Register the agent
+        AgentFactory._register_agent(wrapped_agent, register_as=register_as)
+        
+        return wrapped_agent
+    
+    @staticmethod
+    def create_helper_agent(
+        name: str,
+        agent_type: str,
+        documents: Optional[list] = None,
+        memory: Optional[Any] = None,
+        langsmith_api_key: Optional[str] = None,
+        register_as="helper",
+        **kwargs,
+    ) -> AgentWrapper:
+        """
+        Create a tool agent with the given parameters.
+
+        Parameters:
+        - name (str): The name of the agent.
+        - agent_type (str): The type of agent ("langchain", "huggingface", "openai", "llamaindex", etc.).
+        - documents (list, optional): Documents for LlamaIndex agents.
+        - memory (optional): A memory instance to use with the agent.
+        - langsmith_api_key (str, optional): API key for LangSmith logging.
+        - kwargs: Additional parameters for the agent.
+
+        Returns:
+        - AgentWrapper: A wrapped agent ready for use.
+        """
+        agent = AgentFactory._create_base_agent(agent_type, documents, **kwargs)
+
+        # Wrap the agent using AgentWrapper
+        wrapped_agent = AgentWrapper(
+            name=name,
+            agent=agent,
+            memory=memory,
+            agent_type=agent_type,
+            langsmith_api_key=langsmith_api_key,
+            **kwargs,
+        )
+        
+        # Register the agent
+        AgentFactory._register_agent(wrapped_agent, register_as=register_as)
+        
+        return wrapped_agent
+    
+    @staticmethod
+    def create_react(
+        name: str,
+        agent_type: str,
+        documents: Optional[list] = None,
+        memory: Optional[Any] = None,
+        langsmith_api_key: Optional[str] = None,
+        register_as = "agent",
+        **kwargs,
+    ) -> ReActAgent:
+        """
+        Create a ReAct agent with the given parameters.
+
+        Parameters:
+        - name (str): The name of the agent.
+        - agent_type (str): The type of agent ("langchain", "huggingface", "openai", "llamaindex", etc.).
+        - documents (list, optional): Documents for LlamaIndex agents.
+        - memory (optional): A memory instance to use with the agent.
+        - langsmith_api_key (str, optional): API key for LangSmith logging.
+        - kwargs: Additional parameters for the agent.
+
+        Returns:
+        - AgentWrapper: A wrapped agent ready for use.
+        """
+        agent = AgentFactory._create_base_agent(agent_type, documents, **kwargs)
+        
+        # Wrap the agent using ReActAgent
+        wrapped_agent = ReActAgent(
+            name=name,
+            agent=agent,
+            memory=memory,
+            agent_type=agent_type,
+            langsmith_api_key=langsmith_api_key,
+            **kwargs,
+        )
+        
+        # Register the agent
+        AgentFactory._register_agent(wrapped_agent, register_as=register_as)
+        
+        return wrapped_agent
+    
+    @staticmethod
+    def _register_agent(agent, register_as="agent"):
+        if register_as == "agent":
+            AgentRegistry.register(agent)
+        elif register_as == "helper":
+            AgentRegistry.register_helper_agent(agent)
+        
+        return None
 
     @staticmethod
     def _create_base_agent(agent_type, documents, **kwargs):

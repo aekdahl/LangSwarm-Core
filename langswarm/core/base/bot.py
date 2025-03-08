@@ -5,30 +5,31 @@ import logging
 from types import SimpleNamespace
 
 from ..utils.utilities import Utils
-from ..defaults.prompts.system import HelloWorld
+from ..defaults.prompts.system import HelloWorld, ResourceUsageWorkflow
 
 class LLM:
     """
     A class to interact with Large Language Models (LLMs) using LangChain or OpenAI.
-    
+
     Provides methods for managing conversations, sending queries, and handling memory.
     """
-    
+
     def __init__(
         self, 
-        provider='langchain-openai',
-        model='gpt-4o-mini-2024-07-18', 
+        name=None, 
+        agent=None,
+        model=None, 
+        provider=None,
+        agent_type=None,
         api_key=None,
         temperature=0.0,
         response_format='auto',
         system_prompt=None,
         utils=None,
         verbose=False,
-        name=None, 
         team=None,
         memory=None,
         specialization=None,
-        agent=None,
         plugin_instruction=None,
         tool_instruction=None,
         rag_instruction=None,
@@ -83,6 +84,7 @@ class LLM:
         
         self.memory = memory if not isinstance(memory, list) else None
         self.in_memory = memory if isinstance(memory, list) else []
+        self.agent_type = agent_type
         self.model = model
         self.name = name
         self.team = team
@@ -104,7 +106,6 @@ class LLM:
     def _build_system_prompt(
         self,
         system_prompt=None,
-        hello_world="You are a helpful professional assistant.",
         rag_instruction=None,
         tool_instruction=None,
         plugin_instruction=None
@@ -115,7 +116,7 @@ class LLM:
         a final note is appended indicating multiple requests can be combined.
         """
         # Start with either system_prompt or the default hello_world.
-        main_part = system_prompt or hello_world
+        main_part = system_prompt
 
         # Gather all instructions that are not None or empty.
         instructions = []
@@ -127,12 +128,8 @@ class LLM:
             instructions.append(plugin_instruction)
 
         # If we actually added instructions, add the final note.
-        if len(instructions) > 1:
-            instructions.append(
-                "You may make multiple requests in the same response, "
-                "using any valid request types (rags, tools, plugins) if necessary. "
-                "It is often a good idea to check for both tools and plugins when checking."
-            )
+        if len(instructions) > 0:
+            instructions.append(ResourceUsageWorkflow)
 
         # Build the final prompt with minimal line breaks.
         # The main_part is mandatory, instructions are optional.
